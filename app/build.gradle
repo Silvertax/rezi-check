@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// Signaturdaten liegen lokal in keystore.properties (nicht im Repository, siehe README)
+// Signing data lives locally in keystore.properties (not in the repository, see README)
 def keystorePropsFile = rootProject.file('keystore.properties')
 def keystoreProps = new Properties()
 if (keystorePropsFile.exists()) {
@@ -31,7 +31,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            // Ohne keystore.properties entsteht eine unsignierte Release-APK
+            // Without keystore.properties the release APK is unsigned
             if (keystorePropsFile.exists()) signingConfig signingConfigs.release
         }
     }

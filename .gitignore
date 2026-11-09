@@ -6,13 +6,13 @@ captures/
 *.apk
 *.aab
 
-# Lokale Einstellungen
+# Local settings
 local.properties
 .idea/
 *.iml
 .DS_Store
 
-# Signatur – niemals einchecken
+# Signing – never commit
 keystore.properties
 *.keystore
 *.jks

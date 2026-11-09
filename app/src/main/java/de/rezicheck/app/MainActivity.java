@@ -54,13 +54,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Rezi-Check: Oberfläche (lokales HTML) + unsichtbarer Amazon-WebView, der die
- * Produktseite lädt und per Skript ausliest. Alles bleibt auf dem Gerät.
+ * Rezi-Check: UI (local HTML) + hidden Amazon WebView that loads the product
+ * page and reads it with a script. Everything stays on the device.
  */
 public class MainActivity extends Activity {
 
     private static final String UI_URL = "file:///android_asset/ui/index.html";
-    /** OpenID-Kennungen der Amazon-Shops für die Anmeldeseite; andere Shops leiten über die Bestellübersicht zur Anmeldung. */
+    /** OpenID handles of the Amazon stores for the sign-in page; other stores reach sign-in via the order history. */
     private static final Map<String, String> SIGNIN_HANDLE = new HashMap<>();
     static {
         SIGNIN_HANDLE.put("amazon.de", "deflex");
@@ -84,7 +84,7 @@ public class MainActivity extends Activity {
     private FrameLayout root;
     private WebView ui;
     private WebView worker;
-    private LinearLayout pane;       // sichtbarer Amazon-Bereich (Anmeldung / Sicherheitsabfrage)
+    private LinearLayout pane;       // visible Amazon area (sign-in / security check)
     private TextView paneText;
     private Button paneButton;
 
@@ -100,7 +100,7 @@ public class MainActivity extends Activity {
 
     private Job job;
 
-    /* ---------- Prüfauftrag ---------- */
+    /* ---------- Check job ---------- */
     private static final class Phase {
         final String name, url, label;
         final JSONObject opts;
@@ -124,7 +124,7 @@ public class MainActivity extends Activity {
         Phase current() { return idx >= 0 && idx < phases.size() ? phases.get(idx) : null; }
     }
 
-    /* ---------- Lebenszyklus ---------- */
+    /* ---------- Lifecycle ---------- */
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
         setContentView(root);
         setupSystemBars(dark, bg);
 
-        // Amazon-WebView (liegt unter der Oberfläche)
+        // Amazon WebView (sits underneath the UI)
         pane = new LinearLayout(this);
         pane.setOrientation(LinearLayout.VERTICAL);
         pane.setBackgroundColor(bg);
@@ -165,7 +165,7 @@ public class MainActivity extends Activity {
         pane.addView(worker, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(pane, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // Oberfläche
+        // UI
         ui = new WebView(this);
         ui.setBackgroundColor(bg);
         WebSettings us = ui.getSettings();
@@ -226,7 +226,7 @@ public class MainActivity extends Activity {
         super.onBackPressed();
     }
 
-    /* ---------- System-Leisten (Edge-to-Edge ab Android 15) ---------- */
+    /* ---------- System bars (edge-to-edge from Android 15) ---------- */
     @SuppressWarnings("deprecation")
     private void setupSystemBars(boolean dark, int bg) {
         root.setOnApplyWindowInsetsListener((v, insets) -> {
@@ -280,7 +280,7 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
         s.setTextZoom(100);
-        // Desktop-Ansicht: deren Aufbau ist stabiler und enthält Sterneverteilung + Rezensionen
+        // Desktop layout: more stable structure, includes star distribution + reviews
         String def = WebSettings.getDefaultUserAgent(this);
         Matcher m = Pattern.compile("Chrome/([\\d.]+)").matcher(def);
         String ver = m.find() ? m.group(1) : "140.0.0.0";
@@ -361,12 +361,12 @@ public class MainActivity extends Activity {
                         return;
                     }
                 }
-            } catch (Exception ignored) { /* weiter abfragen */ }
+            } catch (Exception ignored) { /* keep polling */ }
             h.postDelayed(() -> poll(token), 500);
         });
     }
 
-    /* ---------- Ablauf ---------- */
+    /* ---------- Flow ---------- */
     private void startJob(String url, String mode) {
         if (job != null) cancelJob(false);
         if (loginMode) closeLogin();
@@ -405,7 +405,7 @@ public class MainActivity extends Activity {
     private void scheduleTimeout(final Job j, final int idx, long ms) {
         h.postDelayed(() -> {
             if (job != j || j.finished || j.idx != idx) return;
-            if (j.awaitingUser) { scheduleTimeout(j, idx, 15000); return; }   // Nutzer löst gerade etwas
+            if (j.awaitingUser) { scheduleTimeout(j, idx, 15000); return; }   // user is solving something
             Phase ph = j.current();
             if (ph != null && "product".equals(ph.name)) {
                 fail("timeout", "timeout");
@@ -427,7 +427,7 @@ public class MainActivity extends Activity {
             job.interactions++;
             if (job.interactions > 4) { fail(blocks.optBoolean("captcha") ? "captcha" : "signin", ""); return; }
             askUser(s(blocks.optBoolean("captcha") ? R.string.pane_captcha : R.string.pane_signin));
-            job.injected = false;   // nach dem Lösen wird beim nächsten Seitenaufbau neu ausgelesen
+            job.injected = false;   // after solving, the next page load is read again
             return;
         }
         if (job.awaitingUser) { job.awaitingUser = false; hidePane(); }
@@ -550,7 +550,7 @@ public class MainActivity extends Activity {
         return url.trim();
     }
 
-    /* ---------- Sichtbarer Amazon-Bereich ---------- */
+    /* ---------- Visible Amazon area ---------- */
     private void askUser(String text) {
         job.awaitingUser = true;
         paneText.setText(text);
@@ -596,7 +596,7 @@ public class MainActivity extends Activity {
         String st = cleanStore(store);
         String base = "https://www." + st;
         String handle = SIGNIN_HANDLE.get(st);
-        if (handle == null) return base + "/gp/css/order-history";   // leitet zur Anmeldung weiter
+        if (handle == null) return base + "/gp/css/order-history";   // redirects to sign-in
         String enc = Uri.encode(base + "/");
         String id = "http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select";
         return base + "/ap/signin?openid.pape.max_auth_age=0&openid.return_to=" + enc
@@ -625,7 +625,7 @@ public class MainActivity extends Activity {
         return c != null && LOGIN_COOKIE.matcher(c).find();
     }
 
-    /* ---------- Teilen-Ziel ---------- */
+    /* ---------- Share target ---------- */
     private void handleIntent(Intent intent) {
         if (intent == null) return;
         String text = null;
@@ -636,12 +636,12 @@ public class MainActivity extends Activity {
             text = intent.getDataString();
         }
         if (text == null || text.trim().isEmpty()) return;
-        intent.setAction(Intent.ACTION_MAIN);   // nicht erneut auslösen (z. B. nach Drehen)
+        intent.setAction(Intent.ACTION_MAIN);   // don't trigger again (e.g. after rotation)
         if (uiReady) js("RC.onIncoming(" + JSONObject.quote(text) + ")");
         else pendingUrl = text;
     }
 
-    /* ---------- Sprache ---------- */
+    /* ---------- Language ---------- */
     private String systemLocale() {
         return getResources().getConfiguration().getLocales().get(0).toLanguageTag();
     }
@@ -663,7 +663,7 @@ public class MainActivity extends Activity {
         return langRes.getString(id);
     }
 
-    /* ---------- Hilfen ---------- */
+    /* ---------- Helpers ---------- */
     private void progress(String text) {
         js("RC.onProgress(" + JSONObject.quote(text) + ")");
     }
@@ -696,7 +696,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /* ---------- Brücke für die Oberfläche ---------- */
+    /* ---------- Bridge for the UI ---------- */
     private final class Bridge {
         @JavascriptInterface public void start(String url, String mode) { h.post(() -> startJob(url, mode)); }
         @JavascriptInterface public void cancel() { h.post(() -> cancelJob(false)); }

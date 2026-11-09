@@ -15,7 +15,7 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v6
-      - name: Debug-APK bauen
+      - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v7
         with:

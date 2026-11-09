@@ -1,13 +1,13 @@
 /*
- * Rezi-Check – Analyse der ausgelesenen Amazon-Daten.
- * analyze(raw, nowMs) -> { grade, score, checks[], ... } – Texte als Schlüssel für i18n.js
- * Reine Heuristik: liefert Indizien, keinen Beweis.
+ * Rezi-Check – analysis of the extracted Amazon data.
+ * analyze(raw, nowMs) -> { grade, score, checks[], ... } – texts as keys for i18n.js
+ * Pure heuristics: provides indications, not proof.
  */
 (function (root) {
   'use strict';
   var DAY = 86400000;
 
-  /* ---------- Hilfsfunktionen ---------- */
+  /* ---------- Helpers ---------- */
   function wc(s) { s = (s || '').trim(); return s ? s.split(/\s+/).length : 0; }
   function toks(s) { return (s || '').toLowerCase().replace(/[^a-z0-9äöüßéèêàâîôûçñ]+/g, ' ').trim().split(' ').filter(Boolean); }
   function ngrams(t, n) { var s = new Set(); for (var i = 0; i + n <= t.length; i++) s.add(t.slice(i, i + n).join(' ')); return s; }
@@ -23,7 +23,7 @@
     return sentence.length > 220 ? cut(sentence, 220) : sentence;
   }
 
-  /* ---------- Muster ---------- */
+  /* ---------- Patterns ---------- */
   var S = '[^.!?\\n]';
   var POS = '(?:(?:positiv\\w*|gut\\w*|top|bessere?\\w*|good|great|positive)[\\s-]*(?:bewertung\\w*|rezension\\w*|reviews?)|(?:5|fünf|five)[\\s-]*(?:sterne?\\w*|stars?)|5\\s*\\*)';
   var INC2 = '(?:gutschein\\w*|geld\\s*zur[üu]ck|geld\\s*erstatt\\w*|r[üu]ckerstatt\\w*|erstattung\\w*|entsch[äa]dig\\w*|paypal|guthaben|geschenk\\w*|gift\\s?cards?|refund\\w*|reimburs\\w*|compensat\\w*|cashback|teilerstattung|gratis[\\s-]?(?:produkt|artikel|ware)\\w*|kostenlos\\w*\\s+(?:produkt|artikel)\\w*|free\\s+(?:product|item))';
@@ -95,7 +95,7 @@
     'amazon.com.be': /belgien|belgium|belgique|belgië/i
   };
 
-  /* ---------- Normalisieren ---------- */
+  /* ---------- Normalize ---------- */
   function normalize(raw) {
     var P = raw.phases || {};
     var pr = P.product || {};
@@ -136,7 +136,7 @@
     };
   }
 
-  /* ---------- Markierungen pro Rezension ---------- */
+  /* ---------- Flags per review ---------- */
   function flagReviews(D) {
     D.all.forEach(function (r) {
       var sents = splitSentences((r.title ? r.title + '. ' : '') + (r.body || ''));
@@ -183,7 +183,7 @@
     };
   }
 
-  /* ---------- Prüfungen (liefern Textschlüssel, übersetzt wird in der Oberfläche) ---------- */
+  /* ---------- Checks (return text keys; translated in the UI) ---------- */
   function M(k, p) { return { k: k, p: p || {} }; }
   function isoOf(ms) { return new Date(ms).toISOString().slice(0, 10); }
 
@@ -423,7 +423,7 @@
     var conf = n >= 40 ? 'high' : n >= 12 ? 'medium' : 'low';
     var confMsg = conf === 'low' ? M('conf.few', { n: n }) : M('conf.checked', { n: n });
 
-    // Bereinigter Stichproben-Schnitt
+    // Adjusted sample average
     var sample = D.recent.length >= 15 ? D.recent : D.unbiased;
     var rated = sample.filter(function (r) { return r.stars; });
     var cleanSet = rated.filter(function (r) { return r.verified && !r.vine && !r.flags.incent && !r.flags.dup; });
