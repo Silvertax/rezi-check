@@ -28,47 +28,65 @@
   <main id="home" class="view">
     <header class="masthead">
       <h1 class="wordmark"><svg class="wordmark__icon" aria-hidden="true"><use href="#i-lens"/></svg>Rezi-Check</h1>
-      <p class="masthead__sub">Prüft, ob die Bewertungen eines Amazon-Produkts echt wirken.</p>
+      <p class="masthead__sub" data-i18n="app.sub"></p>
     </header>
 
     <div id="error" class="alert" hidden></div>
 
-    <section class="sheet form" aria-label="Produkt prüfen">
-      <label class="field__label" for="link">Amazon-Link</label>
+    <section class="sheet form" data-i18n-aria="form.aria">
+      <label class="field__label" for="link" data-i18n="form.label"></label>
       <div class="field">
-        <input id="link" class="field__input" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
-               placeholder="amzn.eu/d/… oder amazon.de/dp/…">
-        <button id="paste" class="btn btn--quiet field__paste" type="button">Einfügen</button>
+        <input id="link" class="field__input" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button id="paste" class="btn btn--quiet field__paste" type="button" data-i18n="form.paste"></button>
       </div>
 
       <fieldset class="mode">
-        <legend class="field__label">Gründlichkeit</legend>
+        <legend class="field__label" data-i18n="form.mode"></legend>
         <div class="seg" role="radiogroup">
-          <label class="seg__opt"><input type="radio" name="mode" value="quick" checked><span>Schnell</span></label>
-          <label class="seg__opt"><input type="radio" name="mode" value="deep"><span>Gründlich</span></label>
+          <label class="seg__opt"><input type="radio" name="mode" value="quick" checked><span data-i18n="mode.quick"></span></label>
+          <label class="seg__opt"><input type="radio" name="mode" value="deep"><span data-i18n="mode.deep"></span></label>
         </div>
         <p id="modeHint" class="mode__hint"></p>
       </fieldset>
 
-      <button id="go" class="btn btn--primary btn--wide" type="button">Prüfen</button>
+      <button id="go" class="btn btn--primary btn--wide" type="button" data-i18n="form.go"></button>
     </section>
 
-    <section class="account" aria-label="Amazon-Konto">
-      <p class="account__state"><span class="account__dot" aria-hidden="true"></span><span id="accText">Amazon: nicht angemeldet</span></p>
-      <button id="accBtn" class="btn btn--quiet" type="button">Anmelden</button>
+    <section class="account" data-i18n-aria="acc.aria">
+      <p class="account__state"><span class="account__dot" aria-hidden="true"></span><span id="accText"></span></p>
+      <button id="accBtn" class="btn btn--quiet" type="button"></button>
     </section>
 
-    <p class="tip">Am schnellsten geht’s aus der Amazon-App: Produkt öffnen, auf <b>Teilen</b> tippen und <b>Rezi-Check</b> wählen.</p>
+    <p class="tip" data-i18n-html="tip_html"></p>
 
     <section class="history" aria-labelledby="histHead">
-      <h2 id="histHead" class="section-title">Zuletzt geprüft</h2>
+      <h2 id="histHead" class="section-title" data-i18n="hist.title"></h2>
       <ul id="histList" class="history__list"></ul>
-      <p id="histEmpty" class="history__empty">Noch nichts geprüft. Füge oben einen Link ein oder teile ein Produkt aus der Amazon-App.</p>
-      <button id="histClear" class="btn btn--quiet history__clear" type="button" hidden>Verlauf löschen</button>
+      <p id="histEmpty" class="history__empty" data-i18n="hist.empty"></p>
+      <button id="histClear" class="btn btn--quiet history__clear" type="button" data-i18n="hist.clear" hidden></button>
+    </section>
+
+    <section class="settings" aria-labelledby="setHead">
+      <h2 id="setHead" class="section-title" data-i18n="settings.title"></h2>
+      <div class="setting">
+        <label for="langSel" class="setting__label" data-i18n="settings.lang"></label>
+        <span class="setting__wrap">
+          <select id="langSel" class="setting__select">
+            <option value="auto"></option>
+            <option value="de" lang="de">Deutsch</option>
+            <option value="en" lang="en">English</option>
+          </select>
+        </span>
+      </div>
+      <div class="setting">
+        <label for="storeSel" class="setting__label" data-i18n="settings.store"></label>
+        <span class="setting__wrap"><select id="storeSel" class="setting__select"></select></span>
+      </div>
+      <p class="setting__hint" data-i18n="settings.storeHint"></p>
     </section>
 
     <footer class="foot">
-      <p>Rezi-Check sucht nach typischen Mustern gefälschter Bewertungen. Das Ergebnis ist eine Einschätzung, kein Beweis. Alle Daten bleiben auf deinem Handy.</p>
+      <p data-i18n="foot.text"></p>
       <p id="ver" class="foot__ver"></p>
     </footer>
   </main>
@@ -79,20 +97,21 @@
       <span class="scan__stars">★★★★★</span>
       <svg class="scan__lens"><use href="#i-lens"/></svg>
     </div>
-    <p class="busy__title">Prüfe Rezensionen …</p>
-    <p id="busyText" class="busy__text">Lade Produktseite …</p>
-    <button id="cancel" class="btn btn--quiet" type="button">Abbrechen</button>
+    <p class="busy__title" data-i18n="busy.title"></p>
+    <p id="busyText" class="busy__text"></p>
+    <button id="cancel" class="btn btn--quiet" type="button" data-i18n="busy.cancel"></button>
   </section>
 
   <!-- Ergebnis -->
   <main id="result" class="view" hidden>
     <nav class="topbar">
-      <button id="back" class="btn btn--quiet topbar__back" type="button"><span aria-hidden="true">‹</span> Zurück</button>
-      <button id="shareBtn" class="btn btn--quiet" type="button">Teilen</button>
+      <button id="back" class="btn btn--quiet topbar__back" type="button"><span aria-hidden="true">‹</span> <span data-i18n="res.back"></span></button>
+      <button id="shareBtn" class="btn btn--quiet" type="button" data-i18n="res.share"></button>
     </nav>
     <article id="report" class="report"></article>
   </main>
 
+  <script src="i18n.js"></script>
   <script src="analyze.js"></script>
   <script src="app.js"></script>
 </body>

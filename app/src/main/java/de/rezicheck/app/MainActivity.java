@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Insets;
 import android.net.Uri;
@@ -44,6 +45,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.List;
 import java.util.Random;
 import java.util.regex.Matcher;
@@ -56,13 +60,20 @@ import java.util.regex.Pattern;
 public class MainActivity extends Activity {
 
     private static final String UI_URL = "file:///android_asset/ui/index.html";
-    private static final String DEFAULT_SIGNIN =
-            "https://www.amazon.de/ap/signin?openid.pape.max_auth_age=0"
-            + "&openid.return_to=https%3A%2F%2Fwww.amazon.de%2F"
-            + "&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select"
-            + "&openid.assoc_handle=deflex&openid.mode=checkid_setup"
-            + "&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select"
-            + "&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0";
+    /** OpenID-Kennungen der Amazon-Shops für die Anmeldeseite; andere Shops leiten über die Bestellübersicht zur Anmeldung. */
+    private static final Map<String, String> SIGNIN_HANDLE = new HashMap<>();
+    static {
+        SIGNIN_HANDLE.put("amazon.de", "deflex");
+        SIGNIN_HANDLE.put("amazon.com", "usflex");
+        SIGNIN_HANDLE.put("amazon.co.uk", "gbflex");
+        SIGNIN_HANDLE.put("amazon.fr", "frflex");
+        SIGNIN_HANDLE.put("amazon.it", "itflex");
+        SIGNIN_HANDLE.put("amazon.es", "esflex");
+        SIGNIN_HANDLE.put("amazon.ca", "caflex");
+        SIGNIN_HANDLE.put("amazon.com.au", "auflex");
+        SIGNIN_HANDLE.put("amazon.in", "inflex");
+    }
+    private static final Pattern STORE_HOST = Pattern.compile("amazon\\.[a-z]{2,3}(\\.[a-z]{2})?");
     private static final Pattern ASIN_IN_URL =
             Pattern.compile("/(?:dp|gp/product|gp/aw/d|product-reviews)/([A-Z0-9]{10})", Pattern.CASE_INSENSITIVE);
     private static final Pattern LOGIN_COOKIE = Pattern.compile("(?:^|;\\s*)(?:sess-)?at-[a-z]+=");
@@ -84,6 +95,8 @@ public class MainActivity extends Activity {
     private volatile boolean uiCanGoBack;
     private boolean loginMode;
     private SharedPreferences prefs;
+    private String resLang;
+    private Resources langRes;
 
     private Job job;
 
@@ -142,7 +155,7 @@ public class MainActivity extends Activity {
         bar.addView(paneText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         paneButton = new Button(this);
         paneButton.setAllCaps(false);
-        paneButton.setText("Fertig");
+        paneButton.setText(s(R.string.btn_done));
         paneButton.setOnClickListener(v -> onPaneButton());
         bar.addView(paneButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         pane.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -308,7 +321,7 @@ public class MainActivity extends Activity {
                 if (ph != null && "product".equals(ph.name)) {
                     fail("load_failed", msg);
                 } else {
-                    job.errors.put("Seite nicht geladen: " + msg);
+                    job.errors.put("reviews_load_failed");
                     nextPhase();
                 }
             }
@@ -360,11 +373,11 @@ public class MainActivity extends Activity {
         job = new Job();
         job.url = normalizeUrl(url);
         job.mode = "deep".equals(mode) ? "deep" : "quick";
-        job.phases.add(new Phase("product", job.url, "Lade Produktseite", opts("product", 0, 0, ""), 60000));
+        job.phases.add(new Phase("product", job.url, s(R.string.phase_product), opts("product", 0, 0, ""), 60000));
         worker.getSettings().setBlockNetworkImage(true);
         worker.getSettings().setUseWideViewPort(true);
         hidePane();
-        progress("Öffne Amazon …");
+        progress(s(R.string.progress_open));
         nextPhase();
     }
 
@@ -395,9 +408,9 @@ public class MainActivity extends Activity {
             if (j.awaitingUser) { scheduleTimeout(j, idx, 15000); return; }   // Nutzer löst gerade etwas
             Phase ph = j.current();
             if (ph != null && "product".equals(ph.name)) {
-                fail("timeout", "Zeitüberschreitung");
+                fail("timeout", "timeout");
             } else {
-                j.errors.put("Zeitüberschreitung beim Nachladen");
+                j.errors.put("reviews_timeout");
                 nextPhase();
             }
         }, ms);
@@ -413,9 +426,7 @@ public class MainActivity extends Activity {
         if (blocks.optBoolean("captcha") || ("product".equals(ph.name) && blocks.optBoolean("signin"))) {
             job.interactions++;
             if (job.interactions > 4) { fail(blocks.optBoolean("captcha") ? "captcha" : "signin", ""); return; }
-            askUser(blocks.optBoolean("captcha")
-                    ? "Amazon möchte prüfen, ob du ein Mensch bist. Bitte löse die Abfrage – danach geht es automatisch weiter."
-                    : "Amazon verlangt eine Anmeldung. Melde dich an – danach geht es automatisch weiter.");
+            askUser(s(blocks.optBoolean("captcha") ? R.string.pane_captcha : R.string.pane_signin));
             job.injected = false;   // nach dem Lösen wird beim nächsten Seitenaufbau neu ausgelesen
             return;
         }
@@ -434,9 +445,9 @@ public class MainActivity extends Activity {
                     if (r.optBoolean("loggedIn") || isLoggedIn(origin)) {
                         String base = origin + "/product-reviews/" + asin + "/?ie=UTF8&reviewerType=all_reviews";
                         job.phases.add(new Phase("critical", base + "&filterByStar=critical&sortBy=recent&pageNumber=1",
-                                "Lade kritische Rezensionen", opts("critical", 20, 2, "Kritische Rezensionen"), 90000));
+                                s(R.string.phase_critical), opts("critical", 20, 2, s(R.string.label_critical)), 90000));
                         job.phases.add(new Phase("recent", base + "&filterByStar=all_stars&sortBy=recent&pageNumber=1",
-                                "Lade neueste Rezensionen", opts("recent", 30, 3, "Neueste Rezensionen"), 90000));
+                                s(R.string.phase_recent), opts("recent", 30, 3, s(R.string.label_recent)), 90000));
                     } else {
                         job.flags.put("needsLogin", true);
                     }
@@ -450,7 +461,7 @@ public class MainActivity extends Activity {
                     if (r.optJSONArray("reviews") != null && r.optJSONArray("reviews").length() > 0) job.results.put(ph.name, r);
                     skipRemaining();
                 } else if (r.has("error")) {
-                    job.errors.put("Auslesen der " + ph.label.replace("Lade ", "") + " fehlgeschlagen");
+                    job.errors.put("reviews_script");
                 } else {
                     job.results.put(ph.name, r);
                 }
@@ -518,6 +529,7 @@ public class MainActivity extends Activity {
         JSONObject o = new JSONObject();
         try {
             o.put("phase", phase);
+            o.put("lang", lang());
             if (target > 0) o.put("target", target);
             if (maxRounds > 0) o.put("maxRounds", maxRounds);
             if (!label.isEmpty()) o.put("label", label);
@@ -542,7 +554,7 @@ public class MainActivity extends Activity {
     private void askUser(String text) {
         job.awaitingUser = true;
         paneText.setText(text);
-        paneButton.setText("Abbrechen");
+        paneButton.setText(s(R.string.btn_cancel));
         worker.getSettings().setBlockNetworkImage(false);
         showPane();
     }
@@ -563,16 +575,33 @@ public class MainActivity extends Activity {
         ui.bringToFront();
     }
 
-    private void openLogin() {
+    private void openLogin(String store) {
         if (job != null) cancelJob(true);
         loginMode = true;
-        paneText.setText("Melde dich bei Amazon an. Deine Zugangsdaten gehen direkt an Amazon – Rezi-Check behält nur die Anmelde-Cookies auf diesem Gerät.");
-        paneButton.setText("Fertig");
-        WebSettings s = worker.getSettings();
-        s.setBlockNetworkImage(false);
-        s.setUseWideViewPort(false);
-        worker.loadUrl(DEFAULT_SIGNIN);
+        paneText.setText(s(R.string.pane_login));
+        paneButton.setText(s(R.string.btn_done));
+        WebSettings ws = worker.getSettings();
+        ws.setBlockNetworkImage(false);
+        ws.setUseWideViewPort(false);
+        worker.loadUrl(signInUrl(store));
         showPane();
+    }
+
+    private static String cleanStore(String store) {
+        String st = store == null ? "" : store.toLowerCase(Locale.ROOT).replaceFirst("^www\\.", "");
+        return STORE_HOST.matcher(st).matches() ? st : "amazon.de";
+    }
+
+    private static String signInUrl(String store) {
+        String st = cleanStore(store);
+        String base = "https://www." + st;
+        String handle = SIGNIN_HANDLE.get(st);
+        if (handle == null) return base + "/gp/css/order-history";   // leitet zur Anmeldung weiter
+        String enc = Uri.encode(base + "/");
+        String id = "http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select";
+        return base + "/ap/signin?openid.pape.max_auth_age=0&openid.return_to=" + enc
+                + "&openid.identity=" + id + "&openid.assoc_handle=" + handle + "&openid.mode=checkid_setup"
+                + "&openid.claimed_id=" + id + "&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0";
     }
 
     private void closeLogin() {
@@ -588,7 +617,7 @@ public class MainActivity extends Activity {
     }
 
     private void notifyLogin() {
-        js("RC.onLoginState(" + isLoggedIn("https://www.amazon.de") + ")");
+        js("RC.onLoginState()");
     }
 
     private boolean isLoggedIn(String origin) {
@@ -612,6 +641,28 @@ public class MainActivity extends Activity {
         else pendingUrl = text;
     }
 
+    /* ---------- Sprache ---------- */
+    private String systemLocale() {
+        return getResources().getConfiguration().getLocales().get(0).toLanguageTag();
+    }
+
+    private String lang() {
+        String p = prefs.getString("p_lang", "auto");
+        if ("de".equals(p) || "en".equals(p)) return p;
+        return systemLocale().toLowerCase(Locale.ROOT).startsWith("de") ? "de" : "en";
+    }
+
+    private String s(int id) {
+        String l = lang();
+        if (langRes == null || !l.equals(resLang)) {
+            Configuration c = new Configuration(getResources().getConfiguration());
+            c.setLocale(Locale.forLanguageTag(l));
+            langRes = createConfigurationContext(c).getResources();
+            resLang = l;
+        }
+        return langRes.getString(id);
+    }
+
     /* ---------- Hilfen ---------- */
     private void progress(String text) {
         js("RC.onProgress(" + JSONObject.quote(text) + ")");
@@ -625,7 +676,7 @@ public class MainActivity extends Activity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, "Keine App zum Öffnen gefunden", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, s(R.string.toast_no_app), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -649,14 +700,15 @@ public class MainActivity extends Activity {
     private final class Bridge {
         @JavascriptInterface public void start(String url, String mode) { h.post(() -> startJob(url, mode)); }
         @JavascriptInterface public void cancel() { h.post(() -> cancelJob(false)); }
-        @JavascriptInterface public void login() { h.post(MainActivity.this::openLogin); }
+        @JavascriptInterface public void loginTo(String store) { h.post(() -> openLogin(store)); }
         @JavascriptInterface public void logout() {
             h.post(() -> CookieManager.getInstance().removeAllCookies(ok -> {
                 CookieManager.getInstance().flush();
                 notifyLogin();
             }));
         }
-        @JavascriptInterface public boolean isLoggedIn() { return MainActivity.this.isLoggedIn("https://www.amazon.de"); }
+        @JavascriptInterface public boolean loggedInFor(String store) { return isLoggedIn("https://www." + cleanStore(store)); }
+        @JavascriptInterface public String getSystemLocale() { return systemLocale(); }
         @JavascriptInterface public boolean isDark() { return isDarkMode(); }
         @JavascriptInterface public String appVersion() { return BuildConfig.VERSION_NAME; }
         @JavascriptInterface public void setCanGoBack(boolean b) { uiCanGoBack = b; }
@@ -677,7 +729,7 @@ public class MainActivity extends Activity {
             h.post(() -> {
                 ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 if (cb != null) cb.setPrimaryClip(ClipData.newPlainText("Rezi-Check", text));
-                if (Build.VERSION.SDK_INT < 33) Toast.makeText(MainActivity.this, "Kopiert", Toast.LENGTH_SHORT).show();
+                if (Build.VERSION.SDK_INT < 33) Toast.makeText(MainActivity.this, s(R.string.toast_copied), Toast.LENGTH_SHORT).show();
             });
         }
         @JavascriptInterface public void open(String url) {
@@ -688,7 +740,7 @@ public class MainActivity extends Activity {
                 Intent s = new Intent(Intent.ACTION_SEND);
                 s.setType("text/plain");
                 s.putExtra(Intent.EXTRA_TEXT, text);
-                startActivity(Intent.createChooser(s, "Ergebnis teilen"));
+                startActivity(Intent.createChooser(s, s(R.string.share_title)));
             });
         }
     }

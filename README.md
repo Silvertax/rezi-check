@@ -1,5 +1,7 @@
 # Rezi-Check
 
+**Deutsch** · [English](README.en.md)
+
 Android-App, die prüft, ob die Bewertungen eines Amazon-Produkts echt wirken.
 
 <p>
@@ -26,6 +28,10 @@ Tipp: Mit [Obtainium](https://github.com/ImranR98/Obtainium) bekommst du neue Ve
 - Oder einen Amazon-Link in die App einfügen und auf **Prüfen** tippen.
 - **Schnell** prüft nur die Produktseite, ohne Anmeldung. Amazon zeigt dort rund 10 Rezensionen.
 - **Gründlich** lädt zusätzlich bis zu 50 kritische und neueste Rezensionen. Dafür meldest du dich einmalig in der App bei Amazon an.
+- **Sprache:** Die App startet in der Sprache deines Handys (Deutsch oder Englisch). Unter **Einstellungen → Sprache** kannst du sie umstellen;
+  ab Android 13 geht das auch in den Android-Einstellungen unter „App-Sprache“.
+- **Amazon-Shop:** Unter **Einstellungen → Amazon-Shop** wählst du, bei welchem Amazon du dich für „Gründlich“ anmeldest
+  (z. B. Amazon.de, Amazon.com, Amazon.co.uk). Prüfen kannst du Produkte aus allen diesen Shops.
 
 ## Was geprüft wird
 
@@ -87,6 +93,7 @@ Dann `./gradlew assembleRelease` ausführen.
 - `app/src/main/java/de/rezicheck/app/MainActivity.java` – App-Hülle: Oberfläche, unsichtbarer Amazon-WebView, Teilen-Ziel, Anmeldung
 - `app/src/main/assets/extract.js` – liest Produktdaten, Sterneverteilung und Rezensionen aus der Amazon-Seite
 - `app/src/main/assets/ui/analyze.js` – die Prüfungen und die Note
+- `app/src/main/assets/ui/i18n.js` – deutsche und englische Texte
 - `app/src/main/assets/ui/` – Oberfläche (HTML, CSS, JavaScript)
 
 ## Rechtliches
@@ -100,6 +107,4 @@ Lizenz: [MIT](LICENSE). Schriftart Barlow: SIL Open Font License 1.1 (`app/src/m
 
 ---
 
-*English: Rezi-Check is an Android app that checks Amazon product reviews for typical fake-review patterns
-(reports of paid reviews, copied texts, incentivized reviews, rating distribution, reused reviews, …) and grades
-them A–F with evidence. The interface is German. Everything runs on the device; there is no server.*
+*English version: [README.en.md](README.en.md)*

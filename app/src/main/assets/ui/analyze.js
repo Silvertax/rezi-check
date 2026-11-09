@@ -1,6 +1,6 @@
 /*
  * Rezi-Check – Analyse der ausgelesenen Amazon-Daten.
- * analyze(raw, nowMs) -> { grade, score, checks[], ... }
+ * analyze(raw, nowMs) -> { grade, score, checks[], ... } – Texte als Schlüssel für i18n.js
  * Reine Heuristik: liefert Indizien, keinen Beweis.
  */
 (function (root) {
@@ -15,10 +15,7 @@
   function jaccard(a, b) { var i = inter(a, b); var u = a.size + b.size - i; return u ? i / u : 0; }
   function mean(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; }
   function pct(a, b) { return b ? Math.round(100 * a / b) : 0; }
-  function f1(x) { return x == null ? '–' : x.toFixed(1).replace('.', ','); }
-  function num(x) { return x == null ? '–' : String(x).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
   function dateMs(iso) { if (!iso) return null; var t = Date.parse(iso + 'T12:00:00Z'); return isNaN(t) ? null : t; }
-  function dShort(ms) { var d = new Date(ms); return d.getUTCDate() + '.' + (d.getUTCMonth() + 1) + '.' + d.getUTCFullYear(); }
   function cut(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + ' …' : s; }
   function splitSentences(text) { return (text || '').split(/(?<=[.!?])\s+|\n+|\s+[-–]\s+/).filter(function (x) { return x.trim().length > 3; }); }
   function quoteAround(sentence) {
@@ -186,94 +183,93 @@
     };
   }
 
-  /* ---------- Prüfungen ---------- */
+  /* ---------- Prüfungen (liefern Textschlüssel, übersetzt wird in der Oberfläche) ---------- */
+  function M(k, p) { return { k: k, p: p || {} }; }
+  function isoOf(ms) { return new Date(ms).toISOString().slice(0, 10); }
+
   function checkManipulation(D) {
     var hits = D.all.filter(function (r) { return r.flags.bribe || r.flags.change || r.flags.card; });
-    var c = { id: 'bribe', title: 'Gekaufte Bewertungen gemeldet?', icon: 'coin' };
-    if (!D.all.length) return na(c, 'Keine Rezensionen zum Durchsuchen.');
+    var c = { id: 'bribe' };
+    if (!D.all.length) return na(c, M('common.noReviews'));
     var n = hits.length;
     c.examples = hits.slice(0, 4).map(function (r) {
-      var cat = r.flags.bribe ? 'bribe' : r.flags.change ? 'change' : 'card';
-      return ex(r, cat);
+      return ex(r, r.flags.bribe ? 'bribe' : r.flags.change ? 'change' : 'card');
     });
-    if (n === 0) return ok(c, 'Kein Käufer berichtet von Geld, Gutscheinen oder Beipackzetteln für gute Bewertungen.');
-    var t = n + (n === 1 ? ' Rezension berichtet' : ' Rezensionen berichten') +
-      ' von Geld, Gutscheinen, Beipack-Karten oder der Bitte, eine Bewertung zu ändern. Das ist bei Amazon verboten – und ein starker Hinweis, dass auch andere Bewertungen „erkauft“ sind.';
-    if (n >= 3) return bad(c, 28, t);
-    if (n === 2) return bad(c, 20, t);
-    return warn(c, 12, t);
+    if (n === 0) return ok(c, M('bribe.ok'));
+    var m = M('bribe.hit', { n: n });
+    if (n >= 3) return bad(c, 28, m);
+    if (n === 2) return bad(c, 20, m);
+    return warn(c, 12, m);
   }
 
   function checkFakeClaims(D) {
     var hits = D.all.filter(function (r) { return r.flags.fake; });
-    var c = { id: 'claims', title: 'Käufer zweifeln an den Bewertungen', icon: 'eye' };
+    var c = { id: 'claims' };
     c.examples = hits.slice(0, 3).map(function (r) { return ex(r, 'fake'); });
-    if (!D.all.length) return na(c, 'Keine Rezensionen zum Durchsuchen.');
-    if (hits.length === 0) return ok(c, 'Niemand bezeichnet die Bewertungen als gekauft oder gefälscht.');
-    var t = hits.length + (hits.length === 1 ? ' Käufer hält' : ' Käufer halten') + ' die Bewertungen für gekauft oder gefälscht. Subjektiv – aber ein Grund, genauer hinzusehen.';
-    if (hits.length >= 3) return warn(c, 10, t);
-    return info(c, 3, t);
+    if (!D.all.length) return na(c, M('common.noReviews'));
+    if (hits.length === 0) return ok(c, M('claims.ok'));
+    var m = M('claims.hit', { n: hits.length });
+    if (hits.length >= 3) return warn(c, 10, m);
+    return info(c, 3, m);
   }
 
   function checkIncentivized(D) {
     var pos = D.all.filter(function (r) { return (r.stars || 0) >= 4 && !r.vine && !r.vineMention; });
     var hits = pos.filter(function (r) { return r.flags.incent; });
-    var c = { id: 'incent', title: 'Produkt gratis bekommen', icon: 'gift' };
+    var c = { id: 'incent' };
     c.examples = hits.slice(0, 3).map(function (r) { return ex(r, 'incent'); });
-    if (!pos.length) return na(c, 'Keine positiven Rezensionen in der Stichprobe.');
+    if (!pos.length) return na(c, M('incent.na'));
+    if (!hits.length) return ok(c, M('incent.ok'));
     var share = hits.length / pos.length;
-    if (!hits.length) return ok(c, 'Keine positive Rezension (außerhalb von Amazon Vine) erwähnt ein Gratis- oder Testprodukt.');
-    var t = (hits.length === 1 ? 'Eine' : hits.length) + ' von ' + pos.length + ' positiven Rezensionen (' + pct(hits.length, pos.length) + ' %) ' +
-      (hits.length === 1 ? 'stammt von jemandem, der das Produkt gratis oder vergünstigt bekommen hat' : 'stammen von Leuten, die das Produkt gratis oder vergünstigt bekommen haben') +
-      ' – außerhalb von Amazons Vine-Programm ist das nicht erlaubt.';
-    if (share >= 0.25 && hits.length >= 2) return bad(c, 22, t);
-    if (share >= 0.10 || hits.length >= 2) return warn(c, 12, t);
-    return info(c, 4, t);
+    var m = M('incent.hit', { n: hits.length, total: pos.length, pct: pct(hits.length, pos.length) });
+    if (share >= 0.25 && hits.length >= 2) return bad(c, 22, m);
+    if (share >= 0.10 || hits.length >= 2) return warn(c, 12, m);
+    return info(c, 4, m);
   }
 
   function checkUnverified(D) {
     var s = D.all.filter(function (r) { return !r.vine; });
     var un = s.filter(function (r) { return !r.verified; });
-    var c = { id: 'verified', title: 'Verifizierte Käufe', icon: 'check' };
+    var c = { id: 'verified' };
     c.examples = un.filter(function (r) { return (r.stars || 0) >= 4; }).slice(0, 2).map(function (r) { return ex(r); });
-    if (s.length < 8) return na(c, 'Zu wenige Rezensionen für eine Aussage (' + s.length + ').');
+    if (s.length < 8) return na(c, M('verified.na', { count: s.length }));
     var share = un.length / s.length;
-    var t = pct(s.length - un.length, s.length) + ' % der Rezensionen sind „Verifizierte Käufe“ (' + un.length + ' von ' + s.length + ' ohne Kaufnachweis).';
-    if (share >= 0.4 && un.length >= 5) return bad(c, 18, t + ' Ungewöhnlich viele – nicht verifizierte Rezensionen lassen sich leicht fälschen.');
-    if (share >= 0.2 && un.length >= 3) return warn(c, 9, t + ' Etwas mehr als üblich.');
-    return ok(c, t);
+    var base = M('verified.base', { pct: pct(s.length - un.length, s.length), un: un.length, count: s.length });
+    if (share >= 0.4 && un.length >= 5) return bad(c, 18, [base, M('verified.bad')]);
+    if (share >= 0.2 && un.length >= 3) return warn(c, 9, [base, M('verified.warn')]);
+    return ok(c, base);
   }
 
   function checkVine(D) {
     var s = D.unbiased;
     var vine = s.filter(function (r) { return r.vine; });
-    var c = { id: 'vine', title: 'Amazon-Vine-Tester', icon: 'leaf' };
-    if (s.length < 5) return na(c, 'Zu wenige Rezensionen.');
+    var c = { id: 'vine' };
+    if (s.length < 5) return na(c, M('common.tooFew'));
+    if (!vine.length) return ok(c, M('vine.ok'));
     var share = vine.length / s.length;
-    if (!vine.length) return ok(c, 'Keine Vine-Rezensionen in der Stichprobe.');
     var non = s.filter(function (r) { return !r.vine && r.stars; });
     var va = mean(vine.filter(function (r) { return r.stars; }).map(function (r) { return r.stars; }));
-    var na_ = mean(non.map(function (r) { return r.stars; }));
-    var t = (vine.length === 1 ? 'Eine' : vine.length) + ' von ' + s.length + ' Rezensionen (' + pct(vine.length, s.length) + ' %) ' + (vine.length === 1 ? 'stammt' : 'stammen') + ' aus Amazon Vine: Tester bekommen das Produkt gratis. Das ist erlaubt, fällt aber oft wohlwollender aus.';
-    var gap = (vine.length >= 3 && non.length >= 3 && va != null && na_ != null) ? va - na_ : 0;
-    if (gap >= 0.8) t += ' Vine-Tester vergeben hier im Schnitt ' + f1(va) + ' ★, alle anderen nur ' + f1(na_) + ' ★.';
-    if (share >= 0.4 || gap >= 1.2) return warn(c, 6, t);
-    if (share >= 0.15 || gap >= 0.8) return info(c, 2, t);
-    return ok(c, t);
+    var nav = mean(non.map(function (r) { return r.stars; }));
+    var msgs = [M('vine.base', { n: vine.length, total: s.length, pct: pct(vine.length, s.length) })];
+    var gap = (vine.length >= 3 && non.length >= 3 && va != null && nav != null) ? va - nav : 0;
+    if (gap >= 0.8) msgs.push(M('vine.gap', { va: va, na: nav }));
+    if (share >= 0.4 || gap >= 1.2) return warn(c, 6, msgs);
+    if (share >= 0.15 || gap >= 0.8) return info(c, 2, msgs);
+    return ok(c, msgs);
   }
 
   function checkDuplicates(D, pairs) {
-    var c = { id: 'dup', title: 'Ähnliche oder kopierte Texte', icon: 'copy' };
+    var c = { id: 'dup' };
     var long = D.all.filter(function (r) { return wc(r.body) >= 15; }).length;
-    if (long < 4) return na(c, 'Zu wenige längere Rezensionen zum Vergleichen.');
-    if (!pairs.length) return ok(c, 'Keine auffällig ähnlichen Texte unter ' + long + ' längeren Rezensionen.');
+    if (long < 4) return na(c, M('dup.na'));
+    if (!pairs.length) return ok(c, M('dup.ok', { count: long }));
     var involved = new Set();
     pairs.forEach(function (p) { involved.add(p.a.id); involved.add(p.b.id); });
     c.examples = [];
     pairs.slice(0, 2).forEach(function (p) { c.examples.push(ex(p.a)); c.examples.push(ex(p.b)); });
-    var t = involved.size + ' Rezensionen verschiedener Personen ähneln sich stark im Wortlaut – typisch für Bewertungen nach Vorlage.';
-    if (pairs.length >= 2 || involved.size >= 3) return bad(c, 25, t);
-    return warn(c, 14, t);
+    var m = M('dup.hit', { count: involved.size });
+    if (pairs.length >= 2 || involved.size >= 3) return bad(c, 25, m);
+    return warn(c, 14, m);
   }
 
   function histAvg(h) {
@@ -285,40 +281,42 @@
 
   function checkHistogram(D) {
     var p = D.product, h = p.histogram;
-    var c = { id: 'hist', title: 'Sterneverteilung', icon: 'bars' };
-    if (!h) return na(c, 'Sterneverteilung nicht gefunden.');
-    if ((p.total || 0) < 30) return na(c, 'Zu wenige Bewertungen (' + num(p.total) + ') für eine Aussage.');
+    var c = { id: 'hist' };
+    if (!h) return na(c, M('hist.notFound'));
+    if ((p.total || 0) < 30) return na(c, M('hist.tooFew', { total: p.total || 0 }));
     var h5 = h[5] || 0, h4 = h[4] || 0, h1 = h[1] || 0, mid = (h[2] || 0) + (h[3] || 0) + h4;
     var r45 = h5 ? h4 / h5 : 1;
     var fewFour = h5 >= 70 && r45 < 0.09;
     var polar = h1 >= 10 && h5 >= 60 && mid <= 15;
-    var parts = [];
-    if (fewFour) parts.push('Fast nur 5 Sterne und kaum 4 Sterne (' + h5 + ' % zu ' + h4 + ' %). Zufriedene echte Käufer vergeben meist auch öfter 4 Sterne.');
-    if (polar) parts.push('„Top oder Flop“: ' + h5 + ' % 5 Sterne, aber ' + h1 + ' % 1 Stern und kaum Mittelfeld – typisch, wenn gute Bewertungen eingekauft werden und echte Käufer enttäuscht sind.');
-    if (fewFour && polar) return bad(c, 15, parts.join(' '));
-    if (fewFour || polar) return warn(c, polar ? 10 : 8, parts.join(' '));
-    if (h5 >= 88 && (p.total || 0) >= 100) return info(c, 4, 'Sehr hoher 5-Sterne-Anteil (' + h5 + ' %). Kann echt sein, ist aber ungewöhnlich.');
-    return ok(c, 'Die Verteilung (' + h5 + ' % 5★, ' + h4 + ' % 4★, ' + h1 + ' % 1★) wirkt natürlich.');
+    var pp = { h5: h5, h4: h4, h1: h1 };
+    var msgs = [];
+    if (fewFour) msgs.push(M('hist.fewFour', pp));
+    if (polar) { if (msgs.length) msgs.push(M('space')); msgs.push(M('hist.polar', pp)); }
+    if (fewFour && polar) return bad(c, 15, msgs);
+    if (fewFour || polar) return warn(c, polar ? 10 : 8, msgs);
+    if (h5 >= 88 && (p.total || 0) >= 100) return info(c, 4, M('hist.high', pp));
+    return ok(c, M('hist.ok', pp));
   }
 
   function checkTrend(D) {
-    var c = { id: 'trend', title: 'Neue vs. alte Bewertungen', icon: 'trend' };
+    var c = { id: 'trend' };
     var rec = D.recent.filter(function (r) { return r.stars; });
     var ha = histAvg(D.product.histogram);
-    if (rec.length < 15 || ha == null) return na(c, 'Nur im Modus „Gründlich“ mit Anmeldung prüfbar.');
+    if (rec.length < 15 || ha == null) return na(c, M('common.deepOnly'));
     var ra = mean(rec.map(function (r) { return r.stars; }));
     var diff = ra - ha;
-    var t = 'Die neuesten ' + rec.length + ' Rezensionen liegen im Schnitt bei ' + f1(ra) + ' ★, alle Bewertungen zusammen bei ' + f1(ha) + ' ★.';
-    if (diff <= -1.3) return bad(c, 16, t + ' Deutlich schlechter: Ältere (womöglich gekaufte) Bewertungen halten den Schnitt hoch – oder die Qualität hat nachgelassen.');
-    if (diff <= -0.8) return warn(c, 10, t + ' Spürbar schlechter als der Gesamtschnitt.');
-    return ok(c, t);
+    var base = M('trend.base', { count: rec.length, ra: ra, ha: ha });
+    if (diff <= -1.3) return bad(c, 16, [base, M('trend.bad')]);
+    if (diff <= -0.8) return warn(c, 10, [base, M('trend.warn')]);
+    return ok(c, base);
   }
 
   function checkBurst(D) {
-    var c = { id: 'burst', title: 'Zeitliche Häufung', icon: 'clock' };
+    var c = { id: 'burst' };
     var rec = D.recent.filter(function (r) { return r.ms; }).sort(function (a, b) { return a.ms - b.ms; });
-    if (rec.length < 15) return na(c, 'Nur im Modus „Gründlich“ mit Anmeldung prüfbar.');
+    if (rec.length < 15) return na(c, M('common.deepOnly'));
     var span = Math.max(1, (rec[rec.length - 1].ms - rec[0].ms) / DAY);
+    if (span < 6) return ok(c, M('burst.short', { count: rec.length }));
     var best = { n: 0, i: 0 };
     for (var i = 0; i < rec.length; i++) {
       var n = 0;
@@ -329,73 +327,67 @@
     var five = win.filter(function (r) { return r.stars === 5; }).length;
     var expected = rec.length * Math.min(3, span) / span;
     var factor = best.n / Math.max(expected, 0.5);
-    var t = best.n + ' der letzten ' + rec.length + ' Rezensionen kamen innerhalb von 3 Tagen (ab ' + dShort(win[0].ms) + '), davon ' + five + '× 5 Sterne.';
-    if (span < 6) return ok(c, 'Die letzten ' + rec.length + ' Rezensionen verteilen sich auf wenige Tage – bei so vielen Bewertungen ist keine Häufung erkennbar.');
-    if (best.n >= 8 && factor >= 6 && five / best.n >= 0.7) return bad(c, 16, t + ' Solche Wellen entstehen oft durch Bewertungs-Kampagnen (aber auch Aktionstage wie Prime Day können Spitzen erzeugen).');
-    if (best.n >= 5 && factor >= 4 && five / best.n >= 0.7) return warn(c, 10, t + ' Auffällige Häufung positiver Rezensionen.');
-    return ok(c, 'Die neuesten Rezensionen verteilen sich gleichmäßig über die Zeit.');
+    var base = M('burst.base', { k: best.n, count: rec.length, from: isoOf(win[0].ms), five: five });
+    if (best.n >= 8 && factor >= 6 && five / best.n >= 0.7) return bad(c, 16, [base, M('burst.bad')]);
+    if (best.n >= 5 && factor >= 4 && five / best.n >= 0.7) return warn(c, 10, [base, M('burst.warn')]);
+    return ok(c, M('burst.ok'));
   }
 
   function checkHijack(D) {
-    var c = { id: 'hijack', title: 'Rezensionen älter als das Produkt', icon: 'link' };
+    var c = { id: 'hijack' };
     var fa = dateMs(D.product.firstAvailable);
-    if (!fa) return na(c, 'Listungsdatum nicht gefunden.');
+    if (!fa) return na(c, M('hijack.na'));
     var old = D.all.filter(function (r) { return r.domestic && r.ms && r.ms < fa - 30 * DAY; });
     c.examples = old.slice(0, 2).map(function (r) { return ex(r); });
-    if (!old.length) return ok(c, 'Alle Rezensionen sind jünger als die Listung (seit ' + dShort(fa) + ').');
-    var t = old.length + (old.length === 1 ? ' Rezension ist' : ' Rezensionen sind') + ' älter als das Produkt selbst (bei Amazon seit ' + dShort(fa) +
-      '). Vermutlich wurden Bewertungen von einem anderen Produkt übernommen („Review-Hijacking“ oder Zusammenlegen von Varianten).';
-    if (D.product.hasVariations) {
-      return info(c, 3, old.length + (old.length === 1 ? ' Rezension ist' : ' Rezensionen sind') + ' älter als diese Variante (bei Amazon seit ' + dShort(fa) +
-        '). Bei Produkten mit Varianten teilen sich alle Varianten die Rezensionen – das kann also harmlos sein. Prüfe, ob die alten Rezensionen wirklich zu diesem Produkt passen.');
-    }
-    if (old.length >= 2) return bad(c, 18, t);
-    return warn(c, 8, t);
+    var since = isoOf(fa);
+    if (!old.length) return ok(c, M('hijack.ok', { since: since }));
+    if (D.product.hasVariations) return info(c, 3, M('hijack.variants', { n: old.length, since: since }));
+    var m = M('hijack.hit', { n: old.length, since: since });
+    if (old.length >= 2) return bad(c, 18, m);
+    return warn(c, 8, m);
   }
 
   function checkVelocity(D) {
     var p = D.product;
-    var c = { id: 'velocity', title: 'Bewertungen im Verhältnis zu Verkäufen', icon: 'speed' };
+    var c = { id: 'velocity' };
     var fa = dateMs(p.firstAvailable);
-    if (!fa || !p.total) return na(c, 'Listungsdatum oder Anzahl der Bewertungen fehlt.');
+    if (!fa || !p.total) return na(c, M('velocity.na'));
     var months = Math.max(1, (D.now - fa) / (30.44 * DAY));
     var perMonth = p.total / months;
-    var base = 'Seit ' + dShort(fa) + ' im Angebot: ' + num(p.total) + ' Bewertungen, also etwa ' + num(Math.round(perMonth)) + ' pro Monat.';
+    var msgs = [M('velocity.base', { since: isoOf(fa), total: p.total, pm: Math.round(perMonth) })];
     if (p.bought) {
-      base += ' Laut Amazon wurde es zuletzt über ' + num(p.bought) + '-mal im Monat gekauft.';
-      if (perMonth > p.bought && months <= 18 && !p.hasVariations) return warn(c, 10, base + ' Das sind mehr Bewertungen pro Monat als Verkäufe – normalerweise bewertet nur ein kleiner Teil der Käufer.');
-      if (perMonth > p.bought * 0.5) return info(c, 3, base + ' Ungewöhnlich viele Bewertungen im Verhältnis zu den Verkäufen' + (p.hasVariations ? ' (allerdings zählen Bewertungen aller Varianten zusammen).' : '.'));
-      return ok(c, base + ' Das passt zusammen.');
+      msgs.push(M('velocity.bought', { b: p.bought }));
+      if (perMonth > p.bought && months <= 18 && !p.hasVariations) return warn(c, 10, msgs.concat(M('velocity.warn')));
+      if (perMonth > p.bought * 0.5) return info(c, 3, msgs.concat(M(p.hasVariations ? 'velocity.infoVariants' : 'velocity.info')));
+      return ok(c, msgs.concat(M('velocity.ok')));
     }
-    if (months < 3 && p.total >= 300) return info(c, 3, base + ' Sehr viele Bewertungen in sehr kurzer Zeit.');
-    return info(c, 0, base);
+    if (months < 3 && p.total >= 300) return info(c, 3, msgs.concat(M('velocity.fast')));
+    return info(c, 0, msgs);
   }
 
   function checkGeneric(D) {
-    var c = { id: 'generic', title: 'Lob ohne Inhalt', icon: 'quote' };
+    var c = { id: 'generic' };
     var five = D.unbiased.filter(function (r) { return r.stars === 5; });
-    if (five.length < 6) return na(c, 'Zu wenige 5-Sterne-Rezensionen.');
+    if (five.length < 6) return na(c, M('generic.na'));
     var short = five.filter(function (r) { return r.words <= 6; });
     c.examples = short.slice(0, 3).map(function (r) { return ex(r); });
-    var t = short.length + ' von ' + five.length + ' 5-Sterne-Rezensionen bestehen aus höchstens sechs Wörtern.';
-    if (short.length / five.length >= 0.5) return info(c, 3, t + ' Viel Lob ohne Details ist ein schwaches Warnsignal.');
-    return ok(c, 'Die 5-Sterne-Rezensionen enthalten überwiegend konkrete Angaben.');
+    if (short.length / five.length >= 0.5) return info(c, 3, [M('generic.base', { n: short.length, total: five.length }), M('generic.info')]);
+    return ok(c, M('generic.ok'));
   }
 
-  function mk(c, level, penalty, text) { c.level = level; c.penalty = penalty || 0; c.text = text; c.examples = c.examples || []; return c; }
-  function ok(c, t) { return mk(c, 'ok', 0, t); }
-  function info(c, p, t) { return mk(c, 'info', p, t); }
-  function warn(c, p, t) { return mk(c, 'warn', p, t); }
-  function bad(c, p, t) { return mk(c, 'bad', p, t); }
-  function na(c, t) { c.examples = []; return mk(c, 'na', 0, t); }
+  function mk(c, level, penalty, msgs) {
+    c.level = level; c.penalty = penalty || 0;
+    c.msgs = Array.isArray(msgs) ? msgs : [msgs];
+    c.examples = c.examples || [];
+    return c;
+  }
+  function ok(c, m) { return mk(c, 'ok', 0, m); }
+  function info(c, p, m) { return mk(c, 'info', p, m); }
+  function warn(c, p, m) { return mk(c, 'warn', p, m); }
+  function bad(c, p, m) { return mk(c, 'bad', p, m); }
+  function na(c, m) { c.examples = []; return mk(c, 'na', 0, m); }
 
-  var GRADES = [
-    { g: 'A', min: 85, label: 'Unauffällig', text: 'Keine typischen Fake-Muster gefunden.' },
-    { g: 'B', min: 70, label: 'Größtenteils unauffällig', text: 'Einzelne Hinweise, aber nichts Gravierendes.' },
-    { g: 'C', min: 55, label: 'Gemischt', text: 'Einige Warnsignale – lies vor allem die kritischen Rezensionen.' },
-    { g: 'D', min: 40, label: 'Deutliche Warnsignale', text: 'Die Bewertungen sind wahrscheinlich teilweise geschönt.' },
-    { g: 'F', min: 0, label: 'Sehr verdächtig', text: 'Starke Hinweise auf manipulierte Bewertungen.' }
-  ];
+  var GRADES = [{ g: 'A', min: 85 }, { g: 'B', min: 70 }, { g: 'C', min: 55 }, { g: 'D', min: 40 }, { g: 'F', min: 0 }];
 
   function analyze(raw, now) {
     var D = normalize(raw);
@@ -423,15 +415,13 @@
     var p = D.product;
     var n = D.all.length;
     var enough = n >= 3 || (p.histogram && (p.total || 0) >= 30);
-    var grade = null;
+    var grade = '?';
     if (enough) {
-      for (var i = 0; i < GRADES.length; i++) if (score >= GRADES[i].min) { grade = GRADES[i]; break; }
+      for (var i = 0; i < GRADES.length; i++) if (score >= GRADES[i].min) { grade = GRADES[i].g; break; }
     }
 
-    var conf, confText;
-    if (n >= 40) { conf = 'hoch'; confText = n + ' Rezensionen geprüft.'; }
-    else if (n >= 12) { conf = 'mittel'; confText = n + ' Rezensionen geprüft.'; }
-    else { conf = 'gering'; confText = 'Nur ' + n + ' Rezension' + (n === 1 ? '' : 'en') + ' sichtbar – Amazon zeigt ohne Anmeldung nur wenige.'; }
+    var conf = n >= 40 ? 'high' : n >= 12 ? 'medium' : 'low';
+    var confMsg = conf === 'low' ? M('conf.few', { n: n }) : M('conf.checked', { n: n });
 
     // Bereinigter Stichproben-Schnitt
     var sample = D.recent.length >= 15 ? D.recent : D.unbiased;
@@ -444,7 +434,7 @@
         clean: mean(cleanSet.map(function (r) { return r.stars; })),
         nAll: rated.length,
         nClean: cleanSet.length,
-        basis: D.recent.length >= 15 ? 'neuesten Rezensionen' : 'sichtbaren Rezensionen'
+        basis: D.recent.length >= 15 ? 'newest' : 'visible'
       };
     }
 
@@ -454,16 +444,16 @@
       .map(function (r) { return { stars: r.stars, title: cut(r.title || '', 90), quote: cut(r.body || '', 260), date: r.date, verified: r.verified, helpful: r.helpful || 0 }; });
 
     var flags = raw.flags || {};
+    var store = D.domain ? D.domain.replace(/^amazon\./, 'Amazon.') : 'Amazon';
     var notes = [];
-    if (flags.restricted) notes.push({ level: 'warn', text: 'Amazon zeigt deinem Konto gerade nur wenige Rezensionen (Schutz vor automatischem Auslesen). Auf amazon.de kannst du die Freigabe anfordern – nutze „Gründlich“ eine Weile nicht.' });
-    if (flags.needsLogin) notes.push({ level: 'info', text: 'Für „Gründlich“ (mehr Rezensionen, Trend und zeitliche Häufung) musst du dich in der App bei Amazon anmelden.' });
-    if (!p.histogram) notes.push({ level: 'info', text: 'Die Sterneverteilung konnte nicht gelesen werden.' });
-    if (n === 0 && (p.total || 0) > 0) notes.push({ level: 'warn', text: 'Es konnten keine Rezensionstexte gelesen werden. Möglicherweise hat Amazon die Seite umgebaut – nutze „Diagnose kopieren“ und schick sie mir.' });
-    if ((flags.errors || []).length) notes.push({ level: 'info', text: 'Hinweis: ' + flags.errors.join(' · ') });
+    if (flags.restricted) notes.push({ level: 'warn', k: 'note.restricted', p: { store: store } });
+    if (flags.needsLogin) notes.push({ level: 'info', k: 'note.needsLogin', p: { store: store } });
+    if (!p.histogram) notes.push({ level: 'info', k: 'note.noHist', p: {} });
+    if (n === 0 && (p.total || 0) > 0) notes.push({ level: 'warn', k: 'note.noText', p: {} });
+    if ((flags.errors || []).length) notes.push({ level: 'info', k: 'note.errors', p: { codes: flags.errors.slice(0, 5) } });
 
-    var bads = checks.filter(function (c) { return c.level === 'bad' || c.level === 'warn'; });
     return {
-      version: 1,
+      version: 2,
       when: D.now,
       product: {
         title: p.title || '', brand: p.brand || '', asin: p.asin || '', url: p.url || '', domain: D.domain,
@@ -472,15 +462,13 @@
       },
       mode: raw.mode || 'quick',
       score: score,
-      grade: grade ? grade.g : '?',
-      label: grade ? grade.label : 'Zu wenig Daten',
-      verdict: grade ? grade.text : 'Für eine Einschätzung fehlen Bewertungen oder Rezensionen.',
+      grade: grade,
       confidence: conf,
-      confidenceText: confText,
+      confMsg: confMsg,
       reviewCount: n,
       adjusted: adjusted,
       checks: checks,
-      warnings: bads.map(function (c) { return c.title; }),
+      warnings: checks.filter(function (c) { return c.level === 'bad' || c.level === 'warn'; }).map(function (c) { return c.id; }),
       critical: critical,
       notes: notes
     };
