@@ -1,0 +1,18 @@
+# Build
+build/
+.gradle/
+.kotlin/
+captures/
+*.apk
+*.aab
+
+# Lokale Einstellungen
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# Signatur – niemals einchecken
+keystore.properties
+*.keystore
+*.jks

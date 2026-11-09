@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="-2" android:translateY="-2">
+    <!-- Lupe -->
+    <path android:pathData="M50,32.5 a17.5,17.5 0 1,1 -0.01,0 Z"
+        android:strokeColor="#FFFFFF" android:strokeWidth="5.5" android:fillColor="#00000000" />
+    <path android:pathData="M62.8,62.8 L75,75"
+        android:strokeColor="#FFFFFF" android:strokeWidth="8" android:strokeLineCap="round" />
+    <!-- Stern im Glas -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M50,40.5 L52.47,47.5 L59.9,47.75 L54.0,52.3 L56.1,59.4 L50,55.3 L43.9,59.4 L46.0,52.3 L40.1,47.75 L47.53,47.5 Z" />
+    </group>
+</vector>

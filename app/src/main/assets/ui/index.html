@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Rezi-Check</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="1" seed="4" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G" result="rough"/>
+        <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.1 1.5" result="speckle"/>
+        <feComposite in="rough" in2="speckle" operator="in"/>
+      </filter>
+      <symbol id="i-lens" viewBox="0 0 24 24">
+        <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M10 6.6l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" fill="currentColor"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- Startseite -->
+  <main id="home" class="view">
+    <header class="masthead">
+      <h1 class="wordmark"><svg class="wordmark__icon" aria-hidden="true"><use href="#i-lens"/></svg>Rezi-Check</h1>
+      <p class="masthead__sub">Prüft, ob die Bewertungen eines Amazon-Produkts echt wirken.</p>
+    </header>
+
+    <div id="error" class="alert" hidden></div>
+
+    <section class="sheet form" aria-label="Produkt prüfen">
+      <label class="field__label" for="link">Amazon-Link</label>
+      <div class="field">
+        <input id="link" class="field__input" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="amzn.eu/d/… oder amazon.de/dp/…">
+        <button id="paste" class="btn btn--quiet field__paste" type="button">Einfügen</button>
+      </div>
+
+      <fieldset class="mode">
+        <legend class="field__label">Gründlichkeit</legend>
+        <div class="seg" role="radiogroup">
+          <label class="seg__opt"><input type="radio" name="mode" value="quick" checked><span>Schnell</span></label>
+          <label class="seg__opt"><input type="radio" name="mode" value="deep"><span>Gründlich</span></label>
+        </div>
+        <p id="modeHint" class="mode__hint"></p>
+      </fieldset>
+
+      <button id="go" class="btn btn--primary btn--wide" type="button">Prüfen</button>
+    </section>
+
+    <section class="account" aria-label="Amazon-Konto">
+      <p class="account__state"><span class="account__dot" aria-hidden="true"></span><span id="accText">Amazon: nicht angemeldet</span></p>
+      <button id="accBtn" class="btn btn--quiet" type="button">Anmelden</button>
+    </section>
+
+    <p class="tip">Am schnellsten geht’s aus der Amazon-App: Produkt öffnen, auf <b>Teilen</b> tippen und <b>Rezi-Check</b> wählen.</p>
+
+    <section class="history" aria-labelledby="histHead">
+      <h2 id="histHead" class="section-title">Zuletzt geprüft</h2>
+      <ul id="histList" class="history__list"></ul>
+      <p id="histEmpty" class="history__empty">Noch nichts geprüft. Füge oben einen Link ein oder teile ein Produkt aus der Amazon-App.</p>
+      <button id="histClear" class="btn btn--quiet history__clear" type="button" hidden>Verlauf löschen</button>
+    </section>
+
+    <footer class="foot">
+      <p>Rezi-Check sucht nach typischen Mustern gefälschter Bewertungen. Das Ergebnis ist eine Einschätzung, kein Beweis. Alle Daten bleiben auf deinem Handy.</p>
+      <p id="ver" class="foot__ver"></p>
+    </footer>
+  </main>
+
+  <!-- Prüfung läuft -->
+  <section id="busy" class="view busy" hidden aria-live="polite">
+    <div class="scan" aria-hidden="true">
+      <span class="scan__stars">★★★★★</span>
+      <svg class="scan__lens"><use href="#i-lens"/></svg>
+    </div>
+    <p class="busy__title">Prüfe Rezensionen …</p>
+    <p id="busyText" class="busy__text">Lade Produktseite …</p>
+    <button id="cancel" class="btn btn--quiet" type="button">Abbrechen</button>
+  </section>
+
+  <!-- Ergebnis -->
+  <main id="result" class="view" hidden>
+    <nav class="topbar">
+      <button id="back" class="btn btn--quiet topbar__back" type="button"><span aria-hidden="true">‹</span> Zurück</button>
+      <button id="shareBtn" class="btn btn--quiet" type="button">Teilen</button>
+    </nav>
+    <article id="report" class="report"></article>
+  </main>
+
+  <script src="analyze.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
