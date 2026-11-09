@@ -132,7 +132,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("rezicheck", MODE_PRIVATE);
         extractJs = readAsset("extract.js");
         boolean dark = isDarkMode();
-        int bg = dark ? Color.parseColor("#0E1526") : Color.parseColor("#E6ECF5");
+        int bg = dark ? Color.parseColor("#000000") : Color.parseColor("#E6ECF5");
 
         root = new FrameLayout(this);
         root.setBackgroundColor(bg);
@@ -148,7 +148,7 @@ public class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         int p = dp(12);
         bar.setPadding(dp(16), p, dp(8), p);
-        bar.setBackgroundColor(dark ? Color.parseColor("#172036") : Color.WHITE);
+        bar.setBackgroundColor(dark ? Color.BLACK : Color.WHITE);
         paneText = new TextView(this);
         paneText.setTextColor(dark ? Color.parseColor("#E7ECF6") : Color.parseColor("#16233F"));
         paneText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
