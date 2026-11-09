@@ -5,7 +5,7 @@ Android app that checks whether the reviews of an Amazon product look genuine.
 <p>
   <img src="docs/screenshots/en-home.png" width="260" alt="Rezi-Check home screen">
   <img src="docs/screenshots/en-result.png" width="260" alt="Result with grade and findings">
-  <img src="docs/screenshots/en-result-dark.png" width="260" alt="Result in dark mode">
+  <img src="docs/screenshots/en-result-dark.png" width="260" alt="Star distribution and critical reviews">
 </p>
 
 Rezi-Check loads the product page right on your phone, looks for typical patterns of fake reviews
