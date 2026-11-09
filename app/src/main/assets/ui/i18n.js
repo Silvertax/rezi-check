@@ -1,7 +1,7 @@
 /*
- * Rezi-Check – Übersetzungen (Deutsch / Englisch).
- * t(key, params): Platzhalter {name} werden ersetzt; Zahlen und ISO-Datumsangaben
- * werden passend zur Sprache formatiert. Pluralformen: key_one / key_other über params.n.
+ * Rezi-Check – translations (German / English).
+ * t(key, params): placeholders {name} are replaced; numbers and ISO dates are
+ * formatted for the language. Plural forms: key_one / key_other via params.n.
  */
 (function (root) {
   'use strict';
@@ -9,7 +9,7 @@
 
   var D = {
     de: {
-      /* ---------- Analyse ---------- */
+      /* ---------- Analysis ---------- */
       'common.noReviews': 'Keine Rezensionen zum Durchsuchen.',
       'common.deepOnly': 'Nur im Modus „Gründlich“ mit Anmeldung prüfbar.',
       'common.tooFew': 'Zu wenige Rezensionen.',
@@ -116,7 +116,7 @@
       'err.reviews_timeout': 'Das Nachladen weiterer Rezensionen hat zu lange gedauert.',
       'err.reviews_script': 'Weitere Rezensionen konnten nicht ausgelesen werden.',
 
-      /* ---------- Oberfläche ---------- */
+      /* ---------- UI ---------- */
       'app.sub': 'Prüft, ob die Bewertungen eines Amazon-Produkts echt wirken.',
       'form.aria': 'Produkt prüfen',
       'form.label': 'Amazon-Link',

@@ -1,8 +1,8 @@
 /*
- * Rezi-Check – Auslese-Skript.
- * Läuft im unsichtbaren Amazon-WebView. Liest Produktdaten, Sterneverteilung
- * und Rezensionen aus dem DOM und legt das Ergebnis in window.__RC_RESULT ab.
- * Die App fragt dieses Ergebnis regelmäßig ab (kein JS-Interface nötig).
+ * Rezi-Check – extraction script.
+ * Runs in the hidden Amazon WebView. Reads product data, star distribution
+ * and reviews from the DOM and stores the result in window.__RC_RESULT.
+ * The app polls this result (no JS interface needed).
  *
  * window.__RC_OPTS = { phase: 'product' | 'critical' | 'recent', target, maxRounds, label, lang }
  */
@@ -33,7 +33,7 @@
   function qa(root, sel) { try { return Array.prototype.slice.call(root.querySelectorAll(sel)); } catch (e) { return []; } }
   function textOf(el) { return el ? clean(el.textContent) : ''; }
 
-  /* Text eines Knotens mit Leerzeichen an Block-/Zeilengrenzen */
+  /* Text of a node with spaces at block/line boundaries */
   function blockText(el, removeSel) {
     if (!el) return '';
     var c = el.cloneNode(true);
@@ -51,7 +51,7 @@
     return isNaN(n) ? null : n;
   }
 
-  /* ---------- Datum & Land ---------- */
+  /* ---------- Date & country ---------- */
   var MONTHS = {
     januar: 1, 'jänner': 1, january: 1, janvier: 1, gennaio: 1, enero: 1, januari: 1, styczeń: 1, stycznia: 1,
     februar: 2, feber: 2, february: 2, 'février': 2, fevrier: 2, febbraio: 2, febrero: 2, februari: 2, lutego: 2,
@@ -81,7 +81,7 @@
       else if (MONTHS[k] && mo === null) { mo = MONTHS[k]; moIdx = i; }
     });
     if (!y || !mo) return null;
-    // Tag: die 1–2-stellige Zahl, die dem Monatsnamen am nächsten steht
+    // Day: the 1–2 digit number closest to the month name
     var best = 99;
     tok.forEach(function (k, i) {
       if (/^\d{1,2}$/.test(k) && +k >= 1 && +k <= 31) {
@@ -103,7 +103,7 @@
     return m ? m[1].trim() : '';
   }
 
-  /* ---------- Einzelne Rezension ---------- */
+  /* ---------- Single review ---------- */
   function parseStars(el) {
     if (!el) return null;
     var cls = (el.getAttribute && el.getAttribute('class')) || '';
@@ -155,7 +155,7 @@
     var profA = q(el, 'a.a-profile, [data-hook="genome-widget"] a, a[href*="amzn1.account"]');
     var pm = profA ? (profA.getAttribute('href') || '').match(/amzn1\.account\.([A-Z0-9]+)/i) : null;
 
-    // Meta-Text = alles außer Titel & Text (für Badges)
+    // Meta text = everything except title & body (for badges)
     var meta = blockText(el, '[data-hook="review-body"], [data-hook="reviewText"], [data-hook="reviewRichContentContainer"], ' +
       '[data-hook="review-collapsed"], .review-text-content, [data-hook="review-title"], [data-hook="reviewTitle"], script, style');
 
@@ -203,7 +203,7 @@
     };
   }
 
-  /* ---------- Produktseite ---------- */
+  /* ---------- Product page ---------- */
   function getAsin() {
     var inp = q(document, '#ASIN, input[name="ASIN"], input[name="ASIN.0"]');
     var v = inp && inp.value;
@@ -229,7 +229,7 @@
       var re = /([1-5])\s*(?:Sternen?|Stern|stars?|[ée]toiles?|stelle|estrellas?|sterren)\D{0,40}?(\d{1,3})\s*%/gi, m;
       while ((m = re.exec(t))) { if (h[m[1]] === undefined) h[m[1]] = +m[2]; }
     }
-    // aria-valuenow der Balken als letzte Rückfalloption
+    // aria-valuenow of the bars as a last fallback
     if (Object.keys(h).length < 3) {
       var meters = qa(root, '[aria-valuenow]');
       if (meters.length === 5) meters.forEach(function (mt, i) { h[5 - i] = parseInt(mt.getAttribute('aria-valuenow'), 10) || 0; });
@@ -281,7 +281,7 @@
     return null;
   }
 
-  /* ---------- Sperren erkennen ---------- */
+  /* ---------- Detect blocks ---------- */
   function detectBlocks(doc, url) {
     url = url || location.href;
     var body = doc.body ? clean(doc.body.textContent).slice(0, 20000) : '';
@@ -325,7 +325,7 @@
   function harvestInto(root, seen, list, source) {
     var added = 0;
     qa(root, REVIEW_SEL).forEach(function (el) {
-      // verschachtelte Treffer (customer_review-… innerhalb data-hook="review") nur einmal
+      // count nested matches (customer_review-… inside data-hook="review") only once
       if (el.parentElement && el.parentElement.closest && el.parentElement.closest(REVIEW_SEL)) return;
       var r = null;
       try { r = parseReview(el); } catch (e) { r = null; }
@@ -347,13 +347,13 @@
     var asin = getAsin();
     if (!q(document, '#productTitle') && !asin) return { phase: 'product', blocks: { notProduct: true }, diag: diag() };
 
-    // Cookie-Banner: nicht notwendige Cookies ablehnen (falls vorhanden)
+    // Cookie banner: reject non-essential cookies (if present)
     try {
       var rej = q(document, '#sp-cc-rejectall-link, #sp-cc-rejectall-container a, button[data-cel-widget="sp-cc-rejectall"]');
       if (rej) rej.click();
-    } catch (e) { /* egal */ }
+    } catch (e) { /* ignore */ }
 
-    // Rezensionsbereich ins Bild scrollen (manches wird erst dann geladen)
+    // Scroll the review section into view (some parts load only then)
     var anchor = q(document, '#reviewsMedley, #customerReviews, #cm-cr-dp-review-list, #customer-reviews_feature_div, #cr-dp-review-list');
     if (anchor && anchor.scrollIntoView) anchor.scrollIntoView();
     else window.scrollTo(0, Math.round((document.body ? document.body.scrollHeight : 4000) * 0.6));

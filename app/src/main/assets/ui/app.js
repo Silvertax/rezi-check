@@ -1,4 +1,4 @@
-/* Rezi-Check – Oberfläche. Spricht über window.Android mit der App. */
+/* Rezi-Check – UI. Talks to the app via window.Android. */
 (function () {
   'use strict';
   var A = window.Android;
@@ -12,7 +12,7 @@
     loggedIn: false, langPref: 'auto', store: 'amazon.de', lastError: null
   };
 
-  /* Amazon-Shops, bei denen man sich für „Gründlich“ anmelden kann */
+  /* Amazon stores you can sign in to for “Thorough” */
   var STORES = ['amazon.de', 'amazon.com', 'amazon.co.uk', 'amazon.fr', 'amazon.it', 'amazon.es', 'amazon.nl',
     'amazon.se', 'amazon.pl', 'amazon.com.be', 'amazon.ca', 'amazon.com.au', 'amazon.in'];
   var REGION_STORE = {
@@ -22,7 +22,7 @@
   };
   var LANG_STORE = { de: 'amazon.de', fr: 'amazon.fr', it: 'amazon.it', es: 'amazon.es', nl: 'amazon.nl', sv: 'amazon.se', pl: 'amazon.pl' };
 
-  /* ---------- Helfer ---------- */
+  /* ---------- Helpers ---------- */
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -30,7 +30,7 @@
   }
   function call(name) {
     var args = Array.prototype.slice.call(arguments, 1);
-    try { if (A && typeof A[name] === 'function') return A[name].apply(A, args); } catch (e) { /* ignorieren */ }
+    try { if (A && typeof A[name] === 'function') return A[name].apply(A, args); } catch (e) { /* ignore */ }
     return null;
   }
   function stars(n) { n = Math.max(0, Math.min(5, Math.round(n || 0))); return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n); }
@@ -65,11 +65,11 @@
       var u = new URL(url);
       var host = u.hostname.toLowerCase();
       if (/(^|\.)amazon\.[a-z.]{2,6}$/.test(host) || /^(amzn\.(eu|to|com|asia)|a\.co)$/.test(host)) return u.href;
-    } catch (e) { /* kein gültiger Link */ }
+    } catch (e) { /* not a valid link */ }
     return null;
   }
 
-  /* ---------- Texte der Seite ---------- */
+  /* ---------- Page texts ---------- */
   function applyStatic() {
     var lang = effectiveLang();
     I.setLang(lang);
@@ -88,7 +88,7 @@
     renderAccount();
   }
 
-  /* ---------- Ansichten ---------- */
+  /* ---------- Views ---------- */
   function show(view) {
     state.view = view;
     $('home').hidden = view !== 'home';
@@ -128,7 +128,7 @@
     updateMode();
   }
 
-  /* ---------- Verlauf ---------- */
+  /* ---------- History ---------- */
   function loadHistory() {
     try { state.history = JSON.parse(call('getPref', 'history') || '[]') || []; } catch (e) { state.history = []; }
   }
@@ -161,7 +161,7 @@
     renderHistory();
   }
 
-  /* ---------- Prüfung starten ---------- */
+  /* ---------- Start a check ---------- */
   function start(text, modeOverride) {
     setError(null);
     var url = findUrl(text);
@@ -236,7 +236,7 @@
     call('copy', txt);
   }
 
-  /* ---------- Ergebnis (Version 2 mit Textschlüsseln, Version 1 mit fertigem deutschem Text) ---------- */
+  /* ---------- Result (version 2 with text keys, version 1 with stored German text) ---------- */
   function isV2(res) { return (res.version || 1) >= 2; }
   function checkTitle(c) { return c.title || t('check.' + c.id + '.title'); }
   function checkText(c) { return c.text || (c.msgs || []).map(function (m) { return t(m.k, m.p); }).join(''); }
@@ -388,12 +388,12 @@
     return false;
   };
 
-  /* ---------- Vorschau im Browser (ohne App) ---------- */
+  /* ---------- Preview in a browser (without the app) ---------- */
   function demo() {
     if (window.__RC_DEMO) setTimeout(function () { RC.onData(window.__RC_DEMO); }, 300);
   }
 
-  /* ---------- Einstellungen ---------- */
+  /* ---------- Settings ---------- */
   function onLanguageChange() {
     state.langPref = $('langSel').value;
     call('setPref', 'lang', state.langPref);
