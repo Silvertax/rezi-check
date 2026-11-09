@@ -68,6 +68,7 @@ The result is an estimate based on patterns, not proof.
 
 - [x] German and English interface (1.1)
 - [x] Sign-in for “Thorough” at all major Amazon stores (1.1)
+- [x] Pure black dark mode (1.2)
 - [ ] Update notice in the app when a new version is released on GitHub
 - [ ] Availability on F-Droid / IzzyOnDroid
 - [ ] More patterns for detecting fake reviews
