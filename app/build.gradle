@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// Signing data lives locally in keystore.properties (not in the repository, see README)
+// Signing data lives locally in keystore.properties (not in the repository)
 def keystorePropsFile = rootProject.file('keystore.properties')
 def keystoreProps = new Properties()
 if (keystorePropsFile.exists()) {

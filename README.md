@@ -64,36 +64,6 @@ The result is an estimate based on patterns, not proof.
 - If Amazon changes its pages, the app may stop recognizing them. Then tap “Copy diagnostics” in the app
   and open an [issue](https://github.com/Silvertax/rezi-check/issues) with the text.
 
-## Building it yourself
-
-Requirements: JDK 17 or later and the Android SDK (platform 36).
-
-```sh
-./gradlew assembleDebug
-```
-
-The APK ends up in `app/build/outputs/apk/debug/`.
-
-For a signed release build, create a file `keystore.properties` in the project folder
-(it is not checked in):
-
-```properties
-storeFile=path/to/your.keystore
-storePassword=…
-keyAlias=…
-keyPassword=…
-```
-
-Then run `./gradlew assembleRelease`.
-
-### Project structure
-
-- `app/src/main/java/de/rezicheck/app/MainActivity.java` – app shell: interface, hidden Amazon WebView, share target, sign-in
-- `app/src/main/assets/extract.js` – reads product data, star distribution and reviews from the Amazon page
-- `app/src/main/assets/ui/analyze.js` – the checks and the grade
-- `app/src/main/assets/ui/i18n.js` – German and English texts
-- `app/src/main/assets/ui/` – interface (HTML, CSS, JavaScript)
-
 ## Legal
 
 Rezi-Check is a private open-source project and is not affiliated with Amazon.
