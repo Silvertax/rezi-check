@@ -2,9 +2,25 @@
 (function () {
   'use strict';
   var A = window.Android;
+  var I = window.RC_I18N;
+  var t = I.t;
   var $ = function (id) { return document.getElementById(id); };
   var RC = window.RC = {};
-  var state = { view: 'home', mode: 'quick', result: null, raw: null, diag: null, url: '', history: [], loggedIn: false };
+  var ISSUES_URL = 'https://github.com/Silvertax/rezi-check/issues';
+  var state = {
+    view: 'home', mode: 'quick', result: null, raw: null, diag: null, url: '', history: [],
+    loggedIn: false, langPref: 'auto', store: 'amazon.de', lastError: null
+  };
+
+  /* Amazon-Shops, bei denen man sich für „Gründlich“ anmelden kann */
+  var STORES = ['amazon.de', 'amazon.com', 'amazon.co.uk', 'amazon.fr', 'amazon.it', 'amazon.es', 'amazon.nl',
+    'amazon.se', 'amazon.pl', 'amazon.com.be', 'amazon.ca', 'amazon.com.au', 'amazon.in'];
+  var REGION_STORE = {
+    DE: 'amazon.de', AT: 'amazon.de', CH: 'amazon.de', LI: 'amazon.de', LU: 'amazon.de',
+    US: 'amazon.com', GB: 'amazon.co.uk', IE: 'amazon.co.uk', FR: 'amazon.fr', IT: 'amazon.it', ES: 'amazon.es',
+    NL: 'amazon.nl', SE: 'amazon.se', PL: 'amazon.pl', BE: 'amazon.com.be', CA: 'amazon.ca', AU: 'amazon.com.au', IN: 'amazon.in'
+  };
+  var LANG_STORE = { de: 'amazon.de', fr: 'amazon.fr', it: 'amazon.it', es: 'amazon.es', nl: 'amazon.nl', sv: 'amazon.se', pl: 'amazon.pl' };
 
   /* ---------- Helfer ---------- */
   function esc(s) {
@@ -17,17 +33,20 @@
     try { if (A && typeof A[name] === 'function') return A[name].apply(A, args); } catch (e) { /* ignorieren */ }
     return null;
   }
-  function f1(x) { return x == null ? '–' : Number(x).toFixed(1).replace('.', ','); }
-  function num(x) { return x == null ? '–' : Number(x).toLocaleString('de-DE'); }
-  function dstr(iso) {
-    if (!iso) return '';
-    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    return m ? (+m[3]) + '.' + (+m[2]) + '.' + m[1] : '';
-  }
-  function dnow(ms) { var d = new Date(ms); return d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear(); }
   function stars(n) { n = Math.max(0, Math.min(5, Math.round(n || 0))); return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n); }
   var GRADE_VAR = { A: '--g-a', B: '--g-b', C: '--g-c', D: '--g-d', F: '--g-f' };
   function gradeColor(g) { return 'var(' + (GRADE_VAR[g] || '--g-na') + ')'; }
+  function gradeKey(g) { return GRADE_VAR[g] ? g : 'none'; }
+  function storeName(s) { return 'Amazon.' + String(s || '').replace(/^amazon\./, ''); }
+
+  function systemLocale() { return call('getSystemLocale') || navigator.language || 'de-DE'; }
+  function systemLang() { return /^de\b/i.test(systemLocale()) ? 'de' : 'en'; }
+  function effectiveLang() { return state.langPref === 'de' || state.langPref === 'en' ? state.langPref : systemLang(); }
+  function defaultStore() {
+    var parts = systemLocale().replace('_', '-').split('-');
+    var region = (parts[1] || '').toUpperCase();
+    return REGION_STORE[region] || LANG_STORE[(parts[0] || '').toLowerCase()] || 'amazon.com';
+  }
 
   function findUrl(text) {
     text = String(text || '').trim();
@@ -39,7 +58,7 @@
     }
     if (!url) {
       var asin = text.match(/^(B0[A-Z0-9]{8}|\d{9}[\dX])$/i);
-      return asin ? 'https://www.amazon.de/dp/' + asin[1].toUpperCase() : null;
+      return asin ? 'https://www.' + state.store + '/dp/' + asin[1].toUpperCase() : null;
     }
     url = url.replace(/[).,;!?]+$/, '');
     try {
@@ -48,6 +67,25 @@
       if (/(^|\.)amazon\.[a-z.]{2,6}$/.test(host) || /^(amzn\.(eu|to|com|asia)|a\.co)$/.test(host)) return u.href;
     } catch (e) { /* kein gültiger Link */ }
     return null;
+  }
+
+  /* ---------- Texte der Seite ---------- */
+  function applyStatic() {
+    var lang = effectiveLang();
+    I.setLang(lang);
+    document.documentElement.lang = lang;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n]'), function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-html]'), function (el) { el.innerHTML = t(el.getAttribute('data-i18n-html')); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-aria]'), function (el) { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
+    $('link').placeholder = t('form.placeholder', { short: state.store === 'amazon.com' ? 'amzn.to/…' : 'amzn.eu/d/…', store: state.store });
+    var sys = systemLang() === 'de' ? 'Deutsch' : 'English';
+    $('langSel').options[0].textContent = t('settings.langAuto', { name: sys });
+    $('langSel').value = state.langPref;
+    $('storeSel').innerHTML = STORES.map(function (s) { return '<option value="' + s + '">' + esc(storeName(s)) + '</option>'; }).join('');
+    $('storeSel').value = state.store;
+    var v = call('appVersion');
+    $('ver').textContent = v ? t('foot.version', { v: v }) : '';
+    renderAccount();
   }
 
   /* ---------- Ansichten ---------- */
@@ -60,35 +98,32 @@
     window.scrollTo(0, 0);
   }
 
-  function setError(title, text, actions) {
+  function setError(err) {
+    state.lastError = err || null;
     var box = $('error');
-    if (!title) { box.hidden = true; box.innerHTML = ''; return; }
-    box.innerHTML = '<p class="alert__title">' + esc(title) + '</p><p class="alert__text">' + esc(text) + '</p>' +
-      (actions && actions.length ? '<div class="alert__actions">' + actions.map(function (a, i) {
-        return '<button class="btn btn--quiet" type="button" data-i="' + i + '">' + esc(a.label) + '</button>';
+    if (!err) { box.hidden = true; box.innerHTML = ''; return; }
+    var actions = err.actions || [];
+    box.innerHTML = '<p class="alert__title">' + esc(t(err.title)) + '</p><p class="alert__text">' + esc(err.text ? t(err.text) : err.raw || '') + '</p>' +
+      (actions.length ? '<div class="alert__actions">' + actions.map(function (a, i) {
+        return '<button class="btn btn--quiet" type="button" data-i="' + i + '">' + esc(t(a.label)) + '</button>';
       }).join('') + '</div>' : '');
-    (actions || []).forEach(function (a, i) {
-      box.querySelector('[data-i="' + i + '"]').addEventListener('click', a.run);
-    });
+    actions.forEach(function (a, i) { box.querySelector('[data-i="' + i + '"]').addEventListener('click', a.run); });
     box.hidden = false;
   }
 
-  var HINTS = {
-    quick: 'Nur die Produktseite, ohne Anmeldung. Amazon zeigt dort rund 10 Rezensionen.',
-    deep: 'Lädt zusätzlich bis zu 50 kritische und neueste Rezensionen. Dafür musst du in Rezi-Check bei Amazon angemeldet sein.'
-  };
   function updateMode() {
     var el = document.querySelector('input[name="mode"]:checked');
     state.mode = el ? el.value : 'quick';
-    var hint = HINTS[state.mode];
-    if (state.mode === 'deep' && !state.loggedIn) hint += ' Du bist noch nicht angemeldet.';
+    var hint = t(state.mode === 'deep' ? 'hint.deep' : 'hint.quick');
+    if (state.mode === 'deep' && !state.loggedIn) hint += t('hint.notLoggedIn', { store: storeName(state.store) });
     $('modeHint').textContent = hint;
     call('setPref', 'mode', state.mode);
   }
 
   function renderAccount() {
-    $('accText').textContent = state.loggedIn ? 'Amazon: angemeldet' : 'Amazon: nicht angemeldet';
-    $('accBtn').textContent = state.loggedIn ? 'Abmelden' : 'Anmelden';
+    state.loggedIn = !!call('loggedInFor', state.store);
+    $('accText').textContent = t(state.loggedIn ? 'acc.on' : 'acc.off', { store: storeName(state.store) });
+    $('accBtn').textContent = t(state.loggedIn ? 'acc.signOut' : 'acc.signIn');
     document.querySelector('.account').classList.toggle('account--on', state.loggedIn);
     updateMode();
   }
@@ -105,14 +140,14 @@
     $('histClear').hidden = h.length === 0;
     list.innerHTML = h.map(function (e, i) {
       return '<li><button class="history__item" type="button" data-i="' + i + '">' +
-        '<span class="mini" style="color:' + gradeColor(e.grade) + '" aria-label="Note ' + esc(e.grade) + '">' + esc(e.grade) + '</span>' +
+        '<span class="mini" style="color:' + gradeColor(e.grade) + '" aria-label="' + esc(t('res.gradeAria', { g: e.grade })) + '">' + esc(e.grade) + '</span>' +
         '<span class="history__title">' + esc(e.title || e.url) + '</span>' +
-        '<span class="history__date">' + esc(dnow(e.when)) + '</span></button></li>';
+        '<span class="history__date">' + esc(I.formatDate(e.when)) + '</span></button></li>';
     }).join('');
     Array.prototype.forEach.call(list.querySelectorAll('.history__item'), function (b) {
       b.addEventListener('click', function () {
         var e = state.history[+b.getAttribute('data-i')];
-        if (!e) return;
+        if (!e || !e.result) return;
         state.raw = null; state.diag = null; state.url = e.url;
         renderResult(e.result);
       });
@@ -121,7 +156,7 @@
   function remember(res, url) {
     var key = res.product.asin || url;
     state.history = state.history.filter(function (e) { return (e.asin || e.url) !== key; });
-    state.history.unshift({ when: res.when, grade: res.grade, label: res.label, title: res.product.title, url: url, asin: res.product.asin, result: res });
+    state.history.unshift({ when: res.when, grade: res.grade, title: res.product.title, url: url, asin: res.product.asin, result: res });
     saveHistory();
     renderHistory();
   }
@@ -132,23 +167,23 @@
     var url = findUrl(text);
     if (!url) {
       show('home');
-      setError('Kein Amazon-Link erkannt', 'Kopiere den Link in der Amazon-App über „Teilen“ → „Link kopieren“ oder aus der Adresszeile des Browsers.');
+      setError({ title: 'err.noUrl.t', text: 'err.noUrl.d' });
       return;
     }
     var mode = modeOverride || state.mode;
     if (mode === 'deep' && !state.loggedIn) {
       show('home');
       $('link').value = url;
-      setError('Für „Gründlich“ anmelden', 'Weitere Rezensionen zeigt Amazon nur angemeldeten Kunden. Melde dich einmalig in Rezi-Check an oder prüfe schnell ohne Anmeldung.', [
-        { label: 'Anmelden', run: function () { setError(null); call('login'); } },
-        { label: 'Schnell prüfen', run: function () { start(url, 'quick'); } }
-      ]);
+      setError({ title: 'err.deepLogin.t', text: 'err.deepLogin.d', actions: [
+        { label: 'err.signIn', run: function () { setError(null); call('loginTo', state.store); } },
+        { label: 'err.quick', run: function () { start(url, 'quick'); } }
+      ] });
       return;
     }
     state.url = url;
     state.raw = null; state.diag = null;
     $('link').value = url;
-    $('busyText').textContent = 'Öffne Amazon …';
+    $('busyText').textContent = t('busy.opening');
     show('busy');
     if (!A) return demo();
     call('start', url, mode);
@@ -158,8 +193,8 @@
     if (state.view === 'busy') call('cancel');
     start(text);
   };
-  RC.onProgress = function (t) { if (t) $('busyText').textContent = t; };
-  RC.onLoginState = function (on) { state.loggedIn = !!on; renderAccount(); };
+  RC.onProgress = function (txt) { if (txt) $('busyText').textContent = txt; };
+  RC.onLoginState = function () { renderAccount(); };
 
   RC.onData = function (raw) {
     state.raw = raw;
@@ -173,27 +208,21 @@
     renderResult(res);
   };
 
-  var ERRORS = {
-    not_product: ['Das ist keine Produktseite', 'Unter dem Link wurde kein Amazon-Produkt gefunden. Öffne das Produkt in der Amazon-App und teile es von dort.'],
-    load_failed: ['Amazon ist nicht erreichbar', 'Die Seite konnte nicht geladen werden. Prüfe deine Internetverbindung und versuch es erneut.'],
-    timeout: ['Amazon hat zu lange gebraucht', 'Die Produktseite wurde nicht rechtzeitig fertig. Versuch es erneut – oft klappt es beim zweiten Mal.'],
-    script: ['Auslesen fehlgeschlagen', 'Die Seite sah anders aus als erwartet. Kopiere die Diagnose und schick sie mir, dann passe ich Rezi-Check an.'],
-    captcha: ['Sicherheitsabfrage nicht gelöst', 'Amazon wollte prüfen, ob du ein Mensch bist. Versuch es erneut und löse die Abfrage.'],
-    signin: ['Amazon verlangt eine Anmeldung', 'Melde dich in Rezi-Check bei Amazon an und versuch es erneut.']
-  };
+  var ERR_KEYS = { not_product: 1, load_failed: 1, timeout: 1, script: 1, captcha: 1, signin: 1 };
   RC.onError = function (code, detail, diag) {
     if (code === 'cancelled') { show('home'); return; }
     state.diag = diag || null;
-    var e = ERRORS[code] || ['Prüfung fehlgeschlagen', String(detail || 'Unbekannter Fehler.')];
     show('home');
-    var actions = [{ label: 'Erneut versuchen', run: function () { start(state.url); } }];
-    if (diag || detail) actions.push({ label: 'Diagnose kopieren', run: copyDiag });
-    if (code === 'signin') actions.unshift({ label: 'Anmelden', run: function () { setError(null); call('login'); } });
-    setError(e[0], e[1], actions);
+    var actions = [{ label: 'err.retry', run: function () { start(state.url); } }];
+    if (diag || detail) actions.push({ label: 'err.copyDiag', run: copyDiag });
+    if (code === 'script') actions.push({ label: 'err.report', run: function () { call('open', ISSUES_URL); } });
+    if (code === 'signin') actions.unshift({ label: 'err.signIn', run: function () { setError(null); call('loginTo', state.store); } });
+    if (ERR_KEYS[code]) setError({ title: 'err.' + code + '.t', text: 'err.' + code + '.d', actions: actions });
+    else setError({ title: 'err.generic.t', raw: String(detail || t('err.unknown')), actions: actions });
   };
 
   function copyDiag() {
-    var d = { app: call('appVersion'), url: state.url, when: new Date().toISOString(), diag: state.diag };
+    var d = { app: call('appVersion'), lang: effectiveLang(), url: state.url, when: new Date().toISOString(), diag: state.diag };
     if (state.raw && state.raw.phases) {
       d.phases = {};
       Object.keys(state.raw.phases).forEach(function (k) {
@@ -207,9 +236,22 @@
     call('copy', txt);
   }
 
-  /* ---------- Ergebnis ---------- */
+  /* ---------- Ergebnis (Version 2 mit Textschlüsseln, Version 1 mit fertigem deutschem Text) ---------- */
+  function isV2(res) { return (res.version || 1) >= 2; }
+  function checkTitle(c) { return c.title || t('check.' + c.id + '.title'); }
+  function checkText(c) { return c.text || (c.msgs || []).map(function (m) { return t(m.k, m.p); }).join(''); }
+  function noteText(n) {
+    if (n.text) return n.text;
+    var p = n.p || {};
+    if (p.codes) {
+      return t(n.k, { list: p.codes.map(function (c) { return I.has('err.' + c) ? t('err.' + c) : c; }).join(' ') });
+    }
+    return t(n.k, p);
+  }
+  function labelOf(res) { return isV2(res) ? t('grade.' + gradeKey(res.grade) + '.label') : res.label; }
+
   function stampSvg(grade, when) {
-    var ring = 'GEPRÜFT • ' + dnow(when) + ' • REZI-CHECK • ';
+    var ring = t('stamp.ring', { date: I.formatDate(when) }).toUpperCase();
     return '<svg viewBox="0 0 120 120" aria-hidden="true"><defs><path id="ring" d="M60,60 m-48.5,0 a48.5,48.5 0 1,1 97,0 a48.5,48.5 0 1,1 -97,0"/></defs>' +
       '<g filter="url(#ink)">' +
       '<circle cx="60" cy="60" r="56" fill="none" stroke="currentColor" stroke-width="4.5"/>' +
@@ -224,93 +266,101 @@
   function exampleHtml(x) {
     var meta = [];
     if (x.stars) meta.push(x.stars + ' ★');
-    if (x.date) meta.push(dstr(x.date));
-    if (x.vine) meta.push('Vine'); else if (x.verified) meta.push('verifizierter Kauf'); else meta.push('nicht verifiziert');
-    return '<li class="example"><p class="example__quote">„' + esc(x.quote || x.title || '') + '“</p>' +
+    if (x.date) meta.push(I.formatDate(x.date));
+    meta.push(x.vine ? t('ex.vine') : x.verified ? t('ex.verified') : t('ex.unverified'));
+    var q = I.getLang() === 'de' ? ['„', '“'] : ['“', '”'];
+    return '<li class="example"><p class="example__quote">' + q[0] + esc(x.quote || x.title || '') + q[1] + '</p>' +
       '<p class="example__meta">' + esc(meta.join(', ')) + '</p></li>';
   }
   function findingHtml(c) {
     var showEx = (c.level === 'bad' || c.level === 'warn' || c.level === 'info') && c.examples && c.examples.length;
     return '<div class="finding lvl-' + c.level + '">' +
       '<span class="mark' + (c.level === 'bad' ? ' mark--bad' : '') + '" aria-hidden="true">' + MARK[c.level] + '</span>' +
-      '<p class="finding__title">' + esc(c.title) + '</p>' +
-      (c.penalty ? '<span class="finding__pts" aria-label="' + c.penalty + ' Punkte Abzug">−' + c.penalty + '</span>' : '<span></span>') +
-      '<p class="finding__text">' + esc(c.text) + '</p>' +
+      '<p class="finding__title">' + esc(checkTitle(c)) + '</p>' +
+      (c.penalty ? '<span class="finding__pts" aria-label="' + esc(t('res.penalty', { n: c.penalty })) + '">−' + c.penalty + '</span>' : '<span></span>') +
+      '<p class="finding__text">' + esc(checkText(c)) + '</p>' +
       (showEx ? '<ul class="examples">' + c.examples.map(exampleHtml).join('') + '</ul>' : '') +
       '</div>';
   }
 
   function renderResult(res) {
     state.result = res;
+    var v2 = isV2(res);
     var p = res.product;
     var g = res.grade;
-    var issues = res.checks.filter(function (c) { return c.level === 'bad' || c.level === 'warn' || c.level === 'info' && c.penalty > 0; });
+    var issues = res.checks.filter(function (c) { return c.level === 'bad' || c.level === 'warn' || (c.level === 'info' && c.penalty > 0); });
     var infos = res.checks.filter(function (c) { return c.level === 'info' && !c.penalty; });
     var oks = res.checks.filter(function (c) { return c.level === 'ok'; });
     var nas = res.checks.filter(function (c) { return c.level === 'na'; });
     var order = { bad: 0, warn: 1, info: 2 };
     issues.sort(function (a, b) { return order[a.level] - order[b.level] || b.penalty - a.penalty; });
 
+    var verdict = v2 ? t('grade.' + gradeKey(g) + '.text') : res.verdict;
+    var confLevel = v2 ? t('conf.' + res.confidence) : res.confidence;
+    var confText = v2 ? t(res.confMsg.k, res.confMsg.p) : res.confidenceText;
+
     var h = '';
     h += '<header class="report__head">' +
       (p.brand ? '<p class="report__brand">' + esc(p.brand) + '</p>' : '') +
-      '<h1 class="report__title">' + esc(p.title || 'Unbekanntes Produkt') + '</h1>' +
+      '<h1 class="report__title">' + esc(p.title || t('res.unknown')) + '</h1>' +
       (p.avg != null || p.total != null ? '<p class="report__rating"><span class="stars" aria-hidden="true">' + stars(p.avg) + '</span> ' +
-        esc(f1(p.avg)) + ' von 5, ' + esc(num(p.total)) + ' Bewertungen</p>' : '') +
+        esc(t('res.rating', { avg: p.avg, total: p.total })) + '</p>' : '') +
       '</header>';
-    h += '<div class="stamp" style="--grade:' + gradeColor(g) + '" role="img" aria-label="Note ' + esc(g) + '">' + stampSvg(g, res.when) + '</div>';
+    h += '<div class="stamp" style="--grade:' + gradeColor(g) + '" role="img" aria-label="' + esc(t('res.gradeAria', { g: g })) + '">' + stampSvg(g, res.when) + '</div>';
     h += '<section class="verdict" style="--grade:' + gradeColor(g) + '">' +
-      '<p class="verdict__label">' + esc(res.label) + '</p>' +
-      '<p class="verdict__text">' + esc(res.verdict) + '</p>' +
-      '<p class="verdict__conf">' + (g !== '?' ? esc(res.score) + ' von 100 Punkten. ' : '') +
-      'Aussagekraft ' + esc(res.confidence) + ': ' + esc(res.confidenceText) + '</p></section>';
+      '<p class="verdict__label">' + esc(labelOf(res)) + '</p>' +
+      '<p class="verdict__text">' + esc(verdict) + '</p>' +
+      '<p class="verdict__conf">' + (g !== '?' ? esc(t('res.points', { score: res.score })) : '') +
+      esc(t('res.conf', { level: confLevel, text: confText })) + '</p></section>';
 
     if (res.notes && res.notes.length) {
       h += '<ul class="notes">' + res.notes.map(function (n) {
-        return '<li class="note' + (n.level === 'warn' ? ' note--warn' : '') + '">' + esc(n.text) + '</li>';
+        return '<li class="note' + (n.level === 'warn' ? ' note--warn' : '') + '">' + esc(noteText(n)) + '</li>';
       }).join('') + '</ul>';
     }
 
-    h += '<section class="block"><h2 class="block__title">Befunde</h2>' +
-      (issues.length ? issues.map(findingHtml).join('') : '<p class="finding__text" style="margin:0 0 10px">Keine Auffälligkeiten gefunden.</p>') +
+    h += '<section class="block"><h2 class="block__title">' + esc(t('res.findings')) + '</h2>' +
+      (issues.length ? issues.map(findingHtml).join('') : '<p class="finding__text" style="margin:0 0 10px">' + esc(t('res.none')) + '</p>') +
       '</section>';
     var calm = infos.concat(oks);
-    if (calm.length) h += '<details class="group"><summary><span>Unauffällig <span class="group__count">' + calm.length + '</span></span></summary>' + calm.map(findingHtml).join('') + '</details>';
-    if (nas.length) h += '<details class="group"><summary><span>Nicht geprüft <span class="group__count">' + nas.length + '</span></span></summary>' + nas.map(findingHtml).join('') + '</details>';
+    if (calm.length) h += '<details class="group"><summary><span>' + esc(t('res.groupOk')) + ' <span class="group__count">' + calm.length + '</span></span></summary>' + calm.map(findingHtml).join('') + '</details>';
+    if (nas.length) h += '<details class="group"><summary><span>' + esc(t('res.groupNa')) + ' <span class="group__count">' + nas.length + '</span></span></summary>' + nas.map(findingHtml).join('') + '</details>';
 
     if (p.histogram) {
-      h += '<section class="block"><h2 class="block__title">Sterneverteilung</h2><div class="hist">';
+      h += '<section class="block"><h2 class="block__title">' + esc(t('res.hist')) + '</h2><div class="hist">';
       for (var s = 5; s >= 1; s--) {
         var v = p.histogram[s] || 0;
-        h += '<span class="hist__label">' + s + ' ★</span><span class="hist__track"><span class="hist__fill" style="display:block;width:' + v + '%"></span></span><span class="hist__val">' + v + ' %</span>';
+        h += '<span class="hist__label">' + s + ' ★</span><span class="hist__track"><span class="hist__fill" style="display:block;width:' + v + '%"></span></span>' +
+          '<span class="hist__val">' + v + (I.getLang() === 'de' ? ' %' : '%') + '</span>';
       }
       h += '</div>';
       if (res.adjusted) {
         var a = res.adjusted;
-        h += '<p class="adj">Ohne auffällige Rezensionen: <b>' + f1(a.clean) + ' ★</b> statt ' + f1(a.all) + ' ★' +
-          '<small>Grundlage: ' + a.nClean + ' von ' + a.nAll + ' ' + esc(a.basis) + ' (verifiziert, kein Vine, kein Gratis-Hinweis, keine Kopie).</small></p>';
+        var basis = v2 ? t('adj.basis.' + a.basis) : a.basis;
+        h += '<p class="adj">' + t('res.adj_html', { clean: a.clean, all: a.all }) +
+          '<small>' + esc(t('res.adjBasis', { nClean: a.nClean, nAll: a.nAll, basis: basis })) + '</small></p>';
       }
       h += '</section>';
     }
 
-    h += '<section class="block"><h2 class="block__title">Kritische Stimmen</h2>';
+    h += '<section class="block"><h2 class="block__title">' + esc(t('res.critical')) + '</h2>';
     if (res.critical && res.critical.length) {
       h += res.critical.map(function (c) {
-        var meta = [dstr(c.date)];
-        meta.push(c.verified ? 'verifizierter Kauf' : 'nicht verifiziert');
-        if (c.helpful) meta.push(c.helpful + '× hilfreich');
-        return '<div class="voice"><p class="voice__head"><span class="stars" aria-label="' + c.stars + ' Sterne">' + stars(c.stars) + '</span>' + esc(c.title) + '</p>' +
+        var meta = [I.formatDate(c.date)];
+        meta.push(c.verified ? t('ex.verified') : t('ex.unverified'));
+        if (c.helpful) meta.push(t('voice.helpful', { n: c.helpful }));
+        return '<div class="voice"><p class="voice__head"><span class="stars" aria-label="' + esc(t('stars.aria', { n: c.stars })) + '">' + stars(c.stars) + '</span>' + esc(c.title) + '</p>' +
           '<p class="voice__quote">' + esc(c.quote) + '</p><p class="voice__meta">' + esc(meta.filter(Boolean).join(', ')) + '</p></div>';
       }).join('');
     } else {
-      h += '<p class="finding__text" style="margin:0 0 12px">Keine Rezension mit 1 oder 2 Sternen in der Stichprobe.</p>';
+      h += '<p class="finding__text" style="margin:0 0 12px">' + esc(t('res.noCritical')) + '</p>';
     }
     h += '</section>';
 
-    h += '<div class="actions"><button id="openAmz" class="btn btn--line" type="button">Bei Amazon öffnen</button>' +
-      '<button id="again" class="btn btn--primary" type="button">Erneut prüfen</button></div>';
-    h += '<div class="small-actions">' + (state.raw || state.diag ? '<button id="diagBtn" class="btn btn--quiet" type="button">Diagnose kopieren</button>' : '') + '</div>';
-    h += '<p class="disclaimer">Rezi-Check sucht nach typischen Mustern gefälschter Bewertungen. Das ist eine Einschätzung, kein Beweis. Geprüft am ' + esc(dnow(res.when)) + '.</p>';
+    h += '<div class="actions"><button id="openAmz" class="btn btn--line" type="button">' + esc(t('res.open')) + '</button>' +
+      '<button id="again" class="btn btn--primary" type="button">' + esc(t('res.again')) + '</button></div>';
+    h += '<div class="small-actions">' + (state.raw || state.diag ? '<button id="diagBtn" class="btn btn--quiet" type="button">' + esc(t('res.diag')) + '</button>' : '') + '</div>';
+    h += '<p class="disclaimer">' + esc(t('res.disclaimer', { date: I.formatDate(res.when) })) + '</p>';
 
     var rep = $('report');
     rep.innerHTML = h;
@@ -318,16 +368,17 @@
     $('openAmz').addEventListener('click', function () { call('open', p.url || state.url); });
     $('again').addEventListener('click', function () { start(p.url || state.url); });
     var db = $('diagBtn'); if (db) db.addEventListener('click', copyDiag);
-    show('result');
+    if (state.view !== 'result') show('result');
   }
 
   function shareText() {
     var r = state.result;
     if (!r) return '';
-    var lines = ['Rezi-Check: Note ' + r.grade + ' – ' + r.label, r.product.title];
-    if (r.warnings && r.warnings.length) lines.push('Auffällig: ' + r.warnings.join(', '));
+    var lines = [t('share.head', { g: r.grade, label: labelOf(r) }), r.product.title];
+    var flagged = (r.warnings || []).map(function (w) { return isV2(r) ? t('check.' + w + '.title') : w; });
+    if (flagged.length) lines.push(t('share.flagged', { list: flagged.join(', ') }));
     lines.push(r.product.url || state.url);
-    lines.push('(Einschätzung anhand typischer Fake-Muster, kein Beweis.)');
+    lines.push(t('share.note'));
     return lines.filter(Boolean).join('\n');
   }
 
@@ -342,38 +393,57 @@
     if (window.__RC_DEMO) setTimeout(function () { RC.onData(window.__RC_DEMO); }, 300);
   }
 
+  /* ---------- Einstellungen ---------- */
+  function onLanguageChange() {
+    state.langPref = $('langSel').value;
+    call('setPref', 'lang', state.langPref);
+    applyStatic();
+    renderHistory();
+    if (state.lastError) setError(state.lastError);
+    if (state.view === 'result' && state.result) renderResult(state.result);
+  }
+  function onStoreChange() {
+    state.store = $('storeSel').value;
+    call('setPref', 'store', state.store);
+    applyStatic();
+  }
+
   /* ---------- Start ---------- */
   function init() {
     var dark = call('isDark');
     if (dark === null) dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.classList.toggle('dark', !!dark);
 
+    var lp = call('getPref', 'lang');
+    state.langPref = lp === 'de' || lp === 'en' ? lp : 'auto';
+    var sp = call('getPref', 'store');
+    state.store = STORES.indexOf(sp) >= 0 ? sp : defaultStore();
+
     var m = call('getPref', 'mode');
     if (m === 'deep' || m === 'quick') {
       var r = document.querySelector('input[name="mode"][value="' + m + '"]');
       if (r) r.checked = true;
     }
-    state.loggedIn = !!call('isLoggedIn');
-    renderAccount();
+    applyStatic();
     loadHistory();
     renderHistory();
-    var v = call('appVersion');
-    $('ver').textContent = v ? 'Version ' + v : '';
 
     Array.prototype.forEach.call(document.querySelectorAll('input[name="mode"]'), function (r) { r.addEventListener('change', updateMode); });
     $('go').addEventListener('click', function () { start($('link').value); });
     $('link').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); start($('link').value); } });
     $('paste').addEventListener('click', function () {
-      var t = call('paste');
-      if (t) { var u = findUrl(t); $('link').value = u || t; if (u) setError(null); }
+      var txt = call('paste');
+      if (txt) { var u = findUrl(txt); $('link').value = u || txt; if (u) setError(null); }
     });
     $('cancel').addEventListener('click', function () { call('cancel'); show('home'); });
     $('accBtn').addEventListener('click', function () {
-      if (state.loggedIn) { call('logout'); } else { call('login'); }
+      if (state.loggedIn) { call('logout'); } else { call('loginTo', state.store); }
     });
     $('histClear').addEventListener('click', function () { state.history = []; saveHistory(); renderHistory(); });
     $('back').addEventListener('click', function () { show('home'); });
     $('shareBtn').addEventListener('click', function () { call('share', shareText()); });
+    $('langSel').addEventListener('change', onLanguageChange);
+    $('storeSel').addEventListener('change', onStoreChange);
 
     show('home');
     var pending = call('getPendingUrl');

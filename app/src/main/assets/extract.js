@@ -4,7 +4,7 @@
  * und Rezensionen aus dem DOM und legt das Ergebnis in window.__RC_RESULT ab.
  * Die App fragt dieses Ergebnis regelmäßig ab (kein JS-Interface nötig).
  *
- * window.__RC_OPTS = { phase: 'product' | 'critical' | 'recent', target, maxRounds, label }
+ * window.__RC_OPTS = { phase: 'product' | 'critical' | 'recent', target, maxRounds, label, lang }
  */
 (function () {
   'use strict';
@@ -15,6 +15,9 @@
   window.__RC_PROGRESS = '';
 
   var REVIEW_SEL = '[data-hook="review"], div[id^="customer_review-"]';
+  var L = OPTS.lang === 'en'
+    ? { reading: 'Reading product page …', waiting: 'Waiting for reviews …', loading: 'Loading reviews' }
+    : { reading: 'Lese Produktseite …', waiting: 'Warte auf Rezensionen …', loading: 'Lade Rezensionen' };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function rand(a, b) { return Math.round(a + Math.random() * (b - a)); }
@@ -332,7 +335,7 @@
   }
 
   async function productPhase() {
-    progress('Lese Produktseite …');
+    progress(L.reading);
     for (var i = 0; i < 25; i++) {
       if (q(document, '#productTitle')) break;
       var bl = detectBlocks(document);
@@ -354,7 +357,7 @@
     var anchor = q(document, '#reviewsMedley, #customerReviews, #cm-cr-dp-review-list, #customer-reviews_feature_div, #cr-dp-review-list');
     if (anchor && anchor.scrollIntoView) anchor.scrollIntoView();
     else window.scrollTo(0, Math.round((document.body ? document.body.scrollHeight : 4000) * 0.6));
-    progress('Warte auf Rezensionen …');
+    progress(L.waiting);
     for (var j = 0; j < 18; j++) {
       if (q(document, REVIEW_SEL) && q(document, '#histogramTable, [data-hook="total-review-count"]')) break;
       await sleep(400);
@@ -425,7 +428,7 @@
   async function reviewPhase() {
     var target = OPTS.target || 20;
     var maxRounds = OPTS.maxRounds || 3;
-    var label = OPTS.label || 'Lade Rezensionen';
+    var label = OPTS.label || L.loading;
     progress(label + ' …');
     for (var i = 0; i < 20; i++) {
       if (q(document, REVIEW_SEL)) break;

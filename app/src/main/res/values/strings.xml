@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Rezi-Check</string>
+    <string name="app_name" translatable="false">Rezi-Check</string>
+    <string name="pane_login">Sign in to Amazon. Your credentials go directly to Amazon – Rezi-Check only keeps the sign-in cookies on this device.</string>
+    <string name="pane_captcha">Amazon wants to check that you are human. Please solve the challenge – the check continues automatically afterwards.</string>
+    <string name="pane_signin">Amazon requires you to sign in. Sign in – the check continues automatically afterwards.</string>
+    <string name="btn_done">Done</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="toast_copied">Copied</string>
+    <string name="toast_no_app">No app found to open this</string>
+    <string name="share_title">Share result</string>
+    <string name="progress_open">Opening Amazon …</string>
+    <string name="phase_product">Loading product page</string>
+    <string name="phase_critical">Loading critical reviews</string>
+    <string name="phase_recent">Loading newest reviews</string>
+    <string name="label_critical">Critical reviews</string>
+    <string name="label_recent">Newest reviews</string>
 </resources>

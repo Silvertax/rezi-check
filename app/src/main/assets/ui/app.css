@@ -144,6 +144,19 @@ b { font-weight: 600; }
   display: grid; place-items: center; font: 800 21px/1 var(--cond); transform: rotate(-8deg);
 }
 
+/* ---------- Einstellungen ---------- */
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--rule); min-height: 52px; }
+.setting__label { font-size: 16px; color: var(--ink); }
+.setting__wrap { position: relative; display: inline-flex; align-items: center; }
+.setting__wrap::after { content: "▾"; position: absolute; right: 6px; color: var(--pen); pointer-events: none; font-size: 14px; }
+.setting__select {
+  appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: var(--pen);
+  font: 600 16px/1.2 var(--body); padding: 12px 24px 12px 8px; text-align: right; text-align-last: right; cursor: pointer; max-width: 62vw;
+}
+.setting__select:focus-visible { outline: 3px solid var(--pen); outline-offset: 2px; border-radius: 4px; }
+.setting__select option { color: var(--ink); background: var(--sheet); }
+.setting__hint { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+
 .foot { margin-top: 34px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
 .foot p { margin: 0 0 6px; }
 .foot__ver { opacity: .7; }
@@ -159,7 +172,7 @@ b { font-weight: 600; }
 
 /* ---------- Ergebnis ---------- */
 .topbar { display: flex; justify-content: space-between; align-items: center; margin: 0 -8px; padding: 2px 0 6px; }
-.topbar__back span { font-size: 22px; line-height: 0; margin-right: 2px; position: relative; top: 1px; }
+.topbar__back span[aria-hidden] { font-size: 22px; line-height: 0; margin-right: 2px; position: relative; top: 1px; }
 
 .report { background: var(--sheet); border-radius: var(--radius); padding: 18px 16px 8px; position: relative; overflow: hidden; }
 .report__head { padding-right: 112px; min-height: 120px; }

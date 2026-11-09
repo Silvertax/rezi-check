@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pane_login">Melde dich bei Amazon an. Deine Zugangsdaten gehen direkt an Amazon – Rezi-Check behält nur die Anmelde-Cookies auf diesem Gerät.</string>
+    <string name="pane_captcha">Amazon möchte prüfen, ob du ein Mensch bist. Bitte löse die Abfrage – danach geht es automatisch weiter.</string>
+    <string name="pane_signin">Amazon verlangt eine Anmeldung. Melde dich an – danach geht es automatisch weiter.</string>
+    <string name="btn_done">Fertig</string>
+    <string name="btn_cancel">Abbrechen</string>
+    <string name="toast_copied">Kopiert</string>
+    <string name="toast_no_app">Keine App zum Öffnen gefunden</string>
+    <string name="share_title">Ergebnis teilen</string>
+    <string name="progress_open">Öffne Amazon …</string>
+    <string name="phase_product">Lade Produktseite</string>
+    <string name="phase_critical">Lade kritische Rezensionen</string>
+    <string name="phase_recent">Lade neueste Rezensionen</string>
+    <string name="label_critical">Kritische Rezensionen</string>
+    <string name="label_recent">Neueste Rezensionen</string>
+</resources>
