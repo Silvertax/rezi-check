@@ -64,6 +64,17 @@ The result is an estimate based on patterns, not proof.
 - If Amazon changes its pages, the app may stop recognizing them. Then tap “Copy diagnostics” in the app
   and open an [issue](https://github.com/Silvertax/rezi-check/issues) with the text.
 
+## Roadmap
+
+- [x] German and English interface (1.1)
+- [x] Sign-in for “Thorough” at all major Amazon stores (1.1)
+- [ ] Update notice in the app when a new version is released on GitHub
+- [ ] Availability on F-Droid / IzzyOnDroid
+- [ ] More patterns for detecting fake reviews
+- [ ] Review checks for other online shops besides Amazon
+
+Ideas or wishes? Open an [issue](https://github.com/Silvertax/rezi-check/issues).
+
 ## Legal
 
 Rezi-Check is a private open-source project and is not affiliated with Amazon.
