@@ -43,6 +43,8 @@ import org.json.JSONTokener;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,6 +76,7 @@ public class MainActivity extends Activity {
         SIGNIN_HANDLE.put("amazon.in", "inflex");
     }
     private static final Pattern STORE_HOST = Pattern.compile("amazon\\.[a-z]{2,3}(\\.[a-z]{2})?");
+    private static final String LATEST_RELEASE_API = "https://api.github.com/repos/Silvertax/rezi-check/releases/latest";
     private static final Pattern ASIN_IN_URL =
             Pattern.compile("/(?:dp|gp/product|gp/aw/d|product-reviews)/([A-Z0-9]{10})", Pattern.CASE_INSENSITIVE);
     private static final Pattern LOGIN_COOKIE = Pattern.compile("(?:^|;\\s*)(?:sess-)?at-[a-z]+=");
@@ -684,6 +687,33 @@ public class MainActivity extends Activity {
         return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()));
     }
 
+    /** Asks GitHub for the latest release (no personal data is sent); the UI decides whether to show a notice. */
+    private void fetchLatestRelease() {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(LATEST_RELEASE_API).openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            c.setRequestProperty("Accept", "application/vnd.github+json");
+            c.setRequestProperty("User-Agent", "Rezi-Check/" + BuildConfig.VERSION_NAME);
+            if (c.getResponseCode() != 200) return;
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            try (InputStream in = c.getInputStream()) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0 && bo.size() < 2_000_000) bo.write(buf, 0, n);
+            }
+            JSONObject o = new JSONObject(bo.toString(StandardCharsets.UTF_8.name()));
+            String tag = o.optString("tag_name", "");
+            String url = o.optString("html_url", "");
+            if (!tag.isEmpty()) js("RC.onUpdateInfo(" + JSONObject.quote(tag) + "," + JSONObject.quote(url) + ")");
+        } catch (Exception ignored) {
+            /* offline or GitHub unreachable: try again another day */
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
     private String readAsset(String name) {
         try (InputStream in = getAssets().open(name)) {
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
@@ -699,6 +729,7 @@ public class MainActivity extends Activity {
     /* ---------- Bridge for the UI ---------- */
     private final class Bridge {
         @JavascriptInterface public void start(String url, String mode) { h.post(() -> startJob(url, mode)); }
+        @JavascriptInterface public void checkUpdate() { new Thread(MainActivity.this::fetchLatestRelease).start(); }
         @JavascriptInterface public void cancel() { h.post(() -> cancelJob(false)); }
         @JavascriptInterface public void loginTo(String store) { h.post(() -> openLogin(store)); }
         @JavascriptInterface public void logout() {

@@ -375,6 +375,105 @@
     return ok(c, M('generic.ok'));
   }
 
+  /* Product nouns (German/English) used to spot reviews that are about a different product.
+     Only unambiguous words; accessories that come with many products (cables, chargers, cases) are left out. */
+  var CATS = {
+    headphones: ['kopfhörer', 'ohrhörer', 'earbud', 'headphone', 'headset', 'earphone'],
+    lamp: ['lampe', 'leuchte', 'glühbirne', 'lichterkette', 'lamp', 'lightbulb'],
+    speaker: ['lautsprecher', 'soundbar', 'speaker'],
+    watch: ['smartwatch', 'armbanduhr', 'wristwatch', 'fitnesstracker'],
+    kitchen: ['mixer', 'blender', 'pfanne', 'kochtopf', 'wasserkocher', 'kettle', 'toaster', 'kaffeemaschine', 'fritteuse', 'airfryer'],
+    knife: ['messer', 'knife', 'knives'],
+    vacuum: ['staubsauger', 'vacuum'],
+    toothbrush: ['zahnbürste', 'toothbrush'],
+    shoes: ['schuhe', 'sneaker', 'stiefel', 'shoes', 'boots', 'sandalen', 'sandals'],
+    clothing: ['jacke', 'jacket', 'pullover', 'sweater', 'jeans', 'kleid', 'socken', 'socks', 'leggings', 'hoodie'],
+    bag: ['rucksack', 'backpack', 'koffer', 'suitcase'],
+    toys: ['spielzeug', 'puzzle', 'kuscheltier'],
+    bedding: ['matratze', 'mattress', 'kissen', 'pillow', 'bettwäsche', 'bettdecke', 'duvet'],
+    tools: ['bohrmaschine', 'akkuschrauber', 'schraubenzieher', 'screwdriver', 'bohrer'],
+    printer: ['drucker', 'printer', 'toner', 'tintenpatrone'],
+    keyboard: ['tastatur', 'keyboard'],
+    tv: ['fernseher', 'television'],
+    razor: ['rasierer', 'shaver', 'razor', 'haarschneider'],
+    cosmetics: ['shampoo', 'lotion', 'parfum', 'parfüm', 'perfume', 'mascara', 'lippenstift', 'lipstick'],
+    supplement: ['kapseln', 'capsules', 'tabletten', 'vitamin'],
+    umbrella: ['regenschirm', 'umbrella'],
+    tent: ['zelt', 'tent'],
+    bike: ['fahrrad', 'bicycle', 'e-bike'],
+    scale: ['waage', 'personenwaage'],
+    fan: ['ventilator', 'heizlüfter'],
+    pet: ['hundeleine', 'katzenstreu', 'futternapf', 'kratzbaum']
+  };
+  var STOP = /^(with|und|and|for|für|mit|ohne|the|der|die|das|von|pack|stück|set|plus|inkl|inklusive|schwarz|weiß|black|white|neu|new)$/;
+
+  function wordHit(token, word) {
+    return word.length >= 6 ? token.indexOf(word) >= 0 : token.indexOf(word) === 0;
+  }
+  function catsIn(tokens) {
+    var out = {};
+    tokens.forEach(function (tk) {
+      for (var g in CATS) {
+        if (out[g]) continue;
+        for (var i = 0; i < CATS[g].length; i++) if (wordHit(tk, CATS[g][i])) { out[g] = tk; break; }
+      }
+    });
+    return out;
+  }
+  function sharesWord(a, b) {
+    if (a === b) return true;
+    if (a.length >= 5 && b.length >= 5) {
+      if (a.indexOf(b) >= 0 || b.indexOf(a) >= 0) return true;
+      if (a.slice(0, 5) === b.slice(0, 5)) return true;
+    }
+    return false;
+  }
+
+  /* Reviews that talk about a different kind of product: a sign of taken-over reviews */
+  function checkMismatch(D) {
+    var c = { id: 'mismatch' };
+    var titleToks = toks((D.product.title || '') + ' ' + (D.product.brand || ''));
+    var keyToks = titleToks.filter(function (x) { return x.length >= 4 && !/^\d/.test(x) && !STOP.test(x); });
+    var revs = D.all.filter(function (r) { return r.domestic && wc(r.body) >= 8; });
+    if (keyToks.length < 2 || revs.length < 4) return na(c, M('mismatch.na'));
+    var titleCats = catsIn(titleToks);
+    var byCat = {};
+    revs.forEach(function (r) {
+      var rt = toks((r.title || '') + ' ' + (r.body || ''));
+      var mentionsProduct = rt.some(function (x) { return x.length >= 4 && keyToks.some(function (k) { return sharesWord(x, k); }); });
+      if (mentionsProduct) return;
+      var cats = catsIn(rt);
+      for (var g in cats) {
+        if (titleCats[g]) continue;
+        (byCat[g] = byCat[g] || []).push({ r: r, word: cats[g] });
+      }
+    });
+    var best = null;
+    for (var g in byCat) if (!best || byCat[g].length > best.length) best = byCat[g];
+    if (!best || best.length < 2) return ok(c, M('mismatch.ok'));
+    best.forEach(function (h) { h.r.flags.mismatch = true; });
+    c.examples = best.slice(0, 3).map(function (h) { return ex(h.r); });
+    var m = M('mismatch.hit', { n: best.length, word: best[0].word });
+    if (best.length >= 3) return bad(c, 20, m);
+    return warn(c, 10, m);
+  }
+
+  /* Brand names that look like a random string of capital letters: a weak hint only */
+  var KNOWN_BRANDS = /^(SONY|ASUS|LEGO|IKEA|BOSCH|PHILIPS|SAMSUNG|ANKER|UGREEN|XIAOMI|HUAWEI|LENOVO|LOGITECH|PANASONIC|BRAUN|NIVEA|ADIDAS|PUMA|NIKE|CASIO|CANON|NIKON|EPSON|MAKITA|DEWALT|KARCHER|SIEMENS|MIELE|TEFAL|ROWENTA|SEVERIN|HISENSE|GARMIN|FITBIT|RAZER|CORSAIR|SANDISK|KINGSTON|CRUCIAL|TPLINK|NETGEAR|OSRAM|VARTA|DURACELL|ENERGIZER|GILLETTE|LOREAL|GARNIER|PAMPERS|ARIEL|PERSIL|PELIKAN|STABILO|RAVENSBURGER|PLAYMOBIL|MATTEL|HASBRO|NINTENDO|MICROSOFT|APPLE|GOOGLE|AMAZON|BASEUS|SOUNDCORE|YAMAHA|MEDION|GRUNDIG|TELEFUNKEN|ONEPLUS|REALME|MOTOROLA|NOKIA|HONOR|ZWILLING|FISKARS|GARDENA|EINHELL|METABO|HILTI|FESTOOL|SCHWARZKOPF|WELEDA|BEURER|STANLEY|SPIGEN|BELKIN|SENNHEISER|BEYERDYNAMIC|TRUST|SHARP|TOSHIBA|FUJIFILM|OLYMPUS|GOPRO|OSMO|BROTHER|KYOCERA|XEROX|INTEL|NVIDIA|GIGABYTE|ASROCK|THERMALTAKE|NZXT)$/;
+  function looksMadeUp(brand) {
+    var b = (brand || '').trim();
+    if (!/^[A-Z]{5,12}$/.test(b) || KNOWN_BRANDS.test(b)) return false;
+    var vowels = (b.match(/[AEIOUY]/g) || []).length;
+    return vowels / b.length < 0.2 || /[^AEIOUY]{4,}/.test(b) || /Q(?!U)/.test(b) || (b.match(/[XZQJ]/g) || []).length >= 2;
+  }
+  function checkBrand(D) {
+    var c = { id: 'brand' };
+    var b = (D.product.brand || '').trim();
+    if (!b) return na(c, M('brand.na'));
+    if (looksMadeUp(b)) return info(c, 3, M('brand.hit', { brand: b }));
+    return ok(c, M('brand.ok', { brand: b }));
+  }
+
   function mk(c, level, penalty, msgs) {
     c.level = level; c.penalty = penalty || 0;
     c.msgs = Array.isArray(msgs) ? msgs : [msgs];
@@ -401,13 +500,15 @@
       checkIncentivized(D),
       checkHistogram(D),
       checkHijack(D),
+      checkMismatch(D),
       checkTrend(D),
       checkBurst(D),
       checkVelocity(D),
       checkUnverified(D),
       checkVine(D),
       checkFakeClaims(D),
-      checkGeneric(D)
+      checkGeneric(D),
+      checkBrand(D)
     ];
     var penalty = checks.reduce(function (s, c) { return s + (c.penalty || 0); }, 0);
     var score = Math.max(0, Math.min(100, 100 - penalty));
@@ -474,7 +575,7 @@
     };
   }
 
-  analyze._internal = { normalize: normalize, classifySentence: classifySentence, splitSentences: splitSentences, isIncent: isIncent, RX: RX };
+  analyze._internal = { normalize: normalize, classifySentence: classifySentence, splitSentences: splitSentences, isIncent: isIncent, looksMadeUp: looksMadeUp, RX: RX };
   if (typeof module !== 'undefined' && module.exports) module.exports = analyze;
   else root.RC_analyze = analyze;
 })(this);

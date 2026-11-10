@@ -31,6 +31,14 @@
       <p class="masthead__sub" data-i18n="app.sub"></p>
     </header>
 
+    <div id="update" class="update" hidden>
+      <p id="updateText" class="update__text"></p>
+      <div class="update__actions">
+        <button id="updateGet" class="btn btn--quiet" type="button" data-i18n="update.get"></button>
+        <button id="updateLater" class="btn btn--quiet" type="button" data-i18n="update.later"></button>
+      </div>
+    </div>
+
     <div id="error" class="alert" hidden></div>
 
     <section class="sheet form" data-i18n-aria="form.aria">
@@ -96,6 +104,11 @@
         <span class="setting__wrap"><select id="storeSel" class="setting__select"></select></span>
       </div>
       <p class="setting__hint" data-i18n="settings.storeHint"></p>
+      <div class="setting">
+        <label for="updChk" class="setting__label" data-i18n="settings.updates"></label>
+        <input id="updChk" class="setting__check" type="checkbox">
+      </div>
+      <p class="setting__hint" data-i18n="settings.updatesHint"></p>
     </section>
 
     <footer class="foot">

@@ -6,10 +6,11 @@
   var t = I.t;
   var $ = function (id) { return document.getElementById(id); };
   var RC = window.RC = {};
-  var ISSUES_URL = 'https://github.com/Silvertax/rezi-check/issues';
+  var REPO_URL = 'https://github.com/Silvertax/rezi-check';
+  var ISSUES_URL = REPO_URL + '/issues';
   var state = {
     view: 'home', mode: 'quick', result: null, raw: null, diag: null, url: '', history: [],
-    loggedIn: false, langPref: 'auto', store: 'amazon.de', lastError: null
+    loggedIn: false, langPref: 'auto', store: 'amazon.de', lastError: null, lastCode: '', lastDetail: '', update: null
   };
 
   /* Amazon stores you can sign in to for “Thorough” */
@@ -212,10 +213,11 @@
   RC.onError = function (code, detail, diag) {
     if (code === 'cancelled') { show('home'); return; }
     state.diag = diag || null;
+    state.lastCode = code || ''; state.lastDetail = String(detail || '');
     show('home');
     var actions = [{ label: 'err.retry', run: function () { start(state.url); } }];
     if (diag || detail) actions.push({ label: 'err.copyDiag', run: copyDiag });
-    if (code === 'script') actions.push({ label: 'err.report', run: function () { call('open', ISSUES_URL); } });
+    if (code !== 'load_failed') actions.push({ label: 'err.report', run: reportProblem });
     if (code === 'signin') actions.unshift({ label: 'err.signIn', run: function () { setError(null); call('loginTo', state.store); } });
     if (ERR_KEYS[code]) setError({ title: 'err.' + code + '.t', text: 'err.' + code + '.d', actions: actions });
     else setError({ title: 'err.generic.t', raw: String(detail || t('err.unknown')), actions: actions });
@@ -235,6 +237,65 @@
     if (txt.length > 60000) txt = txt.slice(0, 60000);
     call('copy', txt);
   }
+
+  /* Opens a pre-filled GitHub issue (compact facts only); the full diagnostics go to the clipboard */
+  function reportProblem() {
+    var res = state.result, raw = state.raw;
+    var lines = ['**What happened?**', '', '(please describe the problem here)', '', '**Diagnostics**',
+      '- App: ' + (call('appVersion') || '?') + ' (' + effectiveLang() + ')',
+      '- Product: ' + (state.url || (res && res.product && res.product.url) || '–')];
+    if (state.lastCode && state.view !== 'result') lines.push('- Error: ' + state.lastCode + (state.lastDetail ? ' – ' + state.lastDetail.slice(0, 300) : ''));
+    if (raw && raw.phases) {
+      lines.push('- Mode: ' + (raw.mode || '?'));
+      Object.keys(raw.phases).forEach(function (k) {
+        var p = raw.phases[k] || {};
+        lines.push('- Phase ' + k + ': ok=' + !!p.ok + ', reviews=' + (p.reviews || []).length + ', blocks=' + JSON.stringify(p.blocks || {}) + (p.error ? ', error=' + String(p.error).slice(0, 200) : ''));
+      });
+      var pp = (raw.phases.product || {}).product || {};
+      lines.push('- Found: title=' + !!pp.title + ', average=' + (pp.avg == null ? 'no' : 'yes') + ', total=' + (pp.total == null ? 'no' : 'yes') + ', histogram=' + !!pp.histogram + ', listed since=' + !!pp.firstAvailable);
+      if (raw.flags && Object.keys(raw.flags).length) lines.push('- Flags: ' + JSON.stringify(raw.flags).slice(0, 300));
+    }
+    if (res && state.view === 'result') lines.push('- Result: grade ' + res.grade + ' (' + res.score + '), ' + res.reviewCount + ' reviews');
+    var dg = state.diag && (state.diag.page || state.diag);
+    if (dg && dg.counts) lines.push('- Page: ' + JSON.stringify(dg.counts) + ', title: ' + String(dg.title || '').slice(0, 80));
+    lines.push('', 'The full diagnostics were copied to the clipboard – paste them below if needed.');
+    var title = state.view === 'result' ? 'Problem with a result' : 'Problem: ' + (state.lastCode || 'check failed');
+    copyDiag();
+    call('open', ISSUES_URL + '/new?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(lines.join('\n').slice(0, 3500)));
+  }
+
+  /* ---------- Update notice (asks GitHub at most once a day; can be turned off) ---------- */
+  function newer(a, b) {
+    var x = String(a).replace(/^v/i, '').split('.'), y = String(b).replace(/^v/i, '').split('.');
+    for (var i = 0; i < Math.max(x.length, y.length); i++) {
+      var p = parseInt(x[i] || '0', 10) || 0, q = parseInt(y[i] || '0', 10) || 0;
+      if (p !== q) return p > q;
+    }
+    return false;
+  }
+  function updatesOn() { return call('getPref', 'updates') !== 'off'; }
+  function renderUpdate() {
+    var u = state.update, cur = call('appVersion') || '0';
+    var showIt = !!u && updatesOn() && newer(u.tag, cur) && call('getPref', 'updateSkip') !== u.tag;
+    $('update').hidden = !showIt;
+    if (showIt) $('updateText').textContent = t('update.text', { v: String(u.tag).replace(/^v/i, '') });
+  }
+  function maybeCheckUpdate() {
+    if (!updatesOn()) { renderUpdate(); return; }
+    try { state.update = JSON.parse(call('getPref', 'updateInfo') || 'null'); } catch (e) { state.update = null; }
+    renderUpdate();
+    var last = parseInt(call('getPref', 'updateCheckedAt') || '0', 10) || 0;
+    if (Date.now() - last > 20 * 3600 * 1000) {
+      call('setPref', 'updateCheckedAt', String(Date.now()));
+      call('checkUpdate');
+    }
+  }
+  RC.onUpdateInfo = function (tag, url) {
+    if (!tag || !/^v?\d+(\.\d+)*$/.test(tag)) return;
+    state.update = { tag: tag, url: String(url || '').indexOf(REPO_URL + '/') === 0 ? url : REPO_URL + '/releases/latest' };
+    call('setPref', 'updateInfo', JSON.stringify(state.update));
+    renderUpdate();
+  };
 
   /* ---------- Result (version 2 with text keys, version 1 with stored German text) ---------- */
   function isV2(res) { return (res.version || 1) >= 2; }
@@ -359,7 +420,8 @@
 
     h += '<div class="actions"><button id="openAmz" class="btn btn--line" type="button">' + esc(t('res.open')) + '</button>' +
       '<button id="again" class="btn btn--primary" type="button">' + esc(t('res.again')) + '</button></div>';
-    h += '<div class="small-actions">' + (state.raw || state.diag ? '<button id="diagBtn" class="btn btn--quiet" type="button">' + esc(t('res.diag')) + '</button>' : '') + '</div>';
+    h += '<div class="small-actions">' + (state.raw || state.diag ? '<button id="diagBtn" class="btn btn--quiet" type="button">' + esc(t('res.diag')) + '</button>' +
+      '<button id="reportBtn" class="btn btn--quiet" type="button">' + esc(t('err.report')) + '</button>' : '') + '</div>';
     h += '<p class="disclaimer">' + esc(t('res.disclaimer', { date: I.formatDate(res.when) })) + '</p>';
 
     var rep = $('report');
@@ -368,6 +430,7 @@
     $('openAmz').addEventListener('click', function () { call('open', p.url || state.url); });
     $('again').addEventListener('click', function () { start(p.url || state.url); });
     var db = $('diagBtn'); if (db) db.addEventListener('click', copyDiag);
+    var rb = $('reportBtn'); if (rb) rb.addEventListener('click', reportProblem);
     if (state.view !== 'result') show('result');
   }
 
@@ -400,6 +463,7 @@
     applyStatic();
     renderHistory();
     if (state.lastError) setError(state.lastError);
+    renderUpdate();
     if (state.view === 'result' && state.result) renderResult(state.result);
   }
   function onStoreChange() {
@@ -450,6 +514,14 @@
     $('shareBtn').addEventListener('click', function () { call('share', shareText()); });
     $('langSel').addEventListener('change', onLanguageChange);
     $('storeSel').addEventListener('change', onStoreChange);
+    $('updChk').checked = updatesOn();
+    $('updChk').addEventListener('change', function () {
+      call('setPref', 'updates', $('updChk').checked ? 'on' : 'off');
+      if ($('updChk').checked) maybeCheckUpdate(); else renderUpdate();
+    });
+    $('updateGet').addEventListener('click', function () { if (state.update) call('open', state.update.url); });
+    $('updateLater').addEventListener('click', function () { if (state.update) call('setPref', 'updateSkip', state.update.tag); renderUpdate(); });
+    maybeCheckUpdate();
 
     show('home');
     var pending = call('getPendingUrl');
