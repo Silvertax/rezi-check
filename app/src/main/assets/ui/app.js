@@ -439,6 +439,12 @@
     $('accBtn').addEventListener('click', function () {
       if (state.loggedIn) { call('logout'); } else { call('loginTo', state.store); }
     });
+    function toggleInfo(open) {
+      $('accInfo').hidden = !open;
+      $('accInfoBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    $('accInfoBtn').addEventListener('click', function () { toggleInfo($('accInfo').hidden); });
+    $('accInfoClose').addEventListener('click', function () { toggleInfo(false); $('accInfoBtn').focus(); });
     $('histClear').addEventListener('click', function () { state.history = []; saveHistory(); renderHistory(); });
     $('back').addEventListener('click', function () { show('home'); });
     $('shareBtn').addEventListener('click', function () { call('share', shareText()); });

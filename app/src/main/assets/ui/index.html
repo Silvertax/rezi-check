@@ -53,9 +53,22 @@
     </section>
 
     <section class="account" data-i18n-aria="acc.aria">
-      <p class="account__state"><span class="account__dot" aria-hidden="true"></span><span id="accText"></span></p>
+      <p class="account__state"><span class="account__dot" aria-hidden="true"></span><span id="accText"></span>
+        <button id="accInfoBtn" class="info-btn" type="button" aria-expanded="false" aria-controls="accInfo" data-i18n-aria="info.aria"><span aria-hidden="true">i</span></button></p>
       <button id="accBtn" class="btn btn--quiet" type="button"></button>
     </section>
+    <div id="accInfo" class="info" hidden>
+      <h2 class="info__title" data-i18n="info.title"></h2>
+      <p data-i18n="info.why"></p>
+      <ul class="info__list">
+        <li data-i18n="info.p1"></li>
+        <li data-i18n="info.p2"></li>
+        <li data-i18n="info.p3"></li>
+        <li data-i18n="info.p4"></li>
+        <li data-i18n="info.p5"></li>
+      </ul>
+      <button id="accInfoClose" class="btn btn--quiet info__close" type="button" data-i18n="info.close"></button>
+    </div>
 
     <p class="tip" data-i18n-html="tip_html"></p>
 
