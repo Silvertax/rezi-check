@@ -24,12 +24,14 @@ Tip: with [Obtainium](https://github.com/ImranR98/Obtainium) you get new version
 
 - In the Amazon app, open a product, tap **Share** and choose **Rezi-Check**.
 - Or paste an Amazon link into the app and tap **Check**.
-- **Quick** checks the product page only, no sign-in needed. Amazon shows about 10 reviews there.
+- **Quick** checks the product page only, no sign-in needed. Amazon usually shows 10 to 30 reviews there.
 - **Thorough** also loads up to 50 critical and newest reviews. For this you sign in to Amazon once inside the app.
 - **Language:** the app starts in your phone’s language (English or German). You can change it under
   **Settings → Language**; on Android 13 and later also in the Android settings under “App languages”.
 - **Amazon store:** under **Settings → Amazon store** you choose which Amazon you sign in to for “Thorough”
   (e.g. Amazon.com, Amazon.co.uk, Amazon.de). You can check products from all of these stores.
+- **When sharing:** by default the app asks whether to check quickly or thoroughly. Under **Settings → When sharing**
+  you can make it start right away with the depth you chose last.
 
 ## What it checks
 
@@ -48,7 +50,8 @@ Tip: with [Obtainium](https://github.com/ImranR98/Obtainium) you get new version
 
 ¹ only in “Thorough” mode
 
-Each finding deducts points. The remaining points (0–100) give the grade.
+Each finding deducts points. The remaining points (0–100) give the grade. The best grade (A) is only given when at least
+20 reviews were checked; with fewer than 12 reviews the grade is marked as preliminary.
 The result is an estimate based on patterns, not proof.
 
 ## Privacy
@@ -60,7 +63,7 @@ The result is an estimate based on patterns, not proof.
 
 ## Limitations
 
-- Without signing in, Amazon shows only about 10 reviews per product.
+- Without signing in, Amazon shows only the selection on the product page (usually 10 to 30 reviews).
 - Amazon may temporarily limit accounts whose behavior looks like automated reading to only a few reviews.
   “Thorough” therefore loads only a few pages, with pauses – still, use it sparingly.
 - If Amazon changes its pages, the app may stop recognizing them. Then tap “Report problem” in the app –
@@ -76,7 +79,8 @@ The result is an estimate based on patterns, not proof.
 - [x] “Report problem” button that opens a pre-filled GitHub issue with the diagnostics (1.4)
 - [ ] Availability on F-Droid / IzzyOnDroid
 - [x] New checks: reviews that don't match the product, and made-up brand names (1.4)
-- [ ] More honest grades when only a few reviews are visible (cap the grade or mark it as preliminary)
+- [x] More honest grades when only a few reviews are visible (1.5)
+- [x] Settings tab with feedback buttons, choice of depth when sharing, faster checks for shared links (1.5)
 - [ ] Warning when “Thorough” is used very often, to protect your Amazon account from being limited
 - [ ] Text patterns for reviews in French, Italian and Spanish
 - [ ] Automated tests in the repository

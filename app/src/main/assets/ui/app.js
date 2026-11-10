@@ -93,6 +93,11 @@
   function show(view) {
     state.view = view;
     $('home').hidden = view !== 'home';
+    $('settings').hidden = view !== 'settings';
+    $('ask').hidden = view !== 'ask';
+    $('tabs').hidden = !(view === 'home' || view === 'settings');
+    if (view === 'home') $('tabHome').setAttribute('aria-current', 'page'); else $('tabHome').removeAttribute('aria-current');
+    if (view === 'settings') $('tabSettings').setAttribute('aria-current', 'page'); else $('tabSettings').removeAttribute('aria-current');
     $('busy').hidden = view !== 'busy';
     $('result').hidden = view !== 'result';
     call('setCanGoBack', view !== 'home');
@@ -190,10 +195,23 @@
     call('start', url, mode);
   }
 
+  /* A link shared from another app: ask for the depth first, or start right away (Settings → When sharing) */
   RC.onIncoming = function (text) {
     if (state.view === 'busy') call('cancel');
-    start(text);
+    var url = findUrl(text);
+    if (!url || call('getPref', 'share') === 'direct') { start(text); return; }
+    setError(null);
+    state.askUrl = url;
+    $('link').value = url;
+    $('askLink').textContent = url.replace(/^https?:\/\/(www\.)?/, '');
+    $('askDeepHint').textContent = t('hint.deep') + (state.loggedIn ? '' : t('hint.notLoggedIn', { store: storeName(state.store) }));
+    show('ask');
   };
+  function chooseMode(mode) {
+    var r = document.querySelector('input[name="mode"][value="' + mode + '"]');
+    if (r) { r.checked = true; updateMode(); }
+    start(state.askUrl, mode);
+  }
   RC.onProgress = function (txt) { if (txt) $('busyText').textContent = txt; };
   RC.onLoginState = function () { renderAccount(); };
 
@@ -229,39 +247,51 @@
       d.phases = {};
       Object.keys(state.raw.phases).forEach(function (k) {
         var p = state.raw.phases[k] || {};
-        d.phases[k] = { ok: p.ok, blocks: p.blocks, error: p.error, reviews: (p.reviews || []).length, product: p.product, diag: p.diag };
+        d.phases[k] = { ok: p.ok, blocks: p.blocks, error: p.error, reviews: (p.reviews || []).length, timing: p.timing, scriptMs: p.ms, product: p.product, diag: p.diag };
       });
       d.flags = state.raw.flags;
+      d.timing = state.raw.timing;
     }
     var txt = JSON.stringify(d, null, 1);
     if (txt.length > 60000) txt = txt.slice(0, 60000);
     call('copy', txt);
   }
 
-  /* Opens a pre-filled GitHub issue (compact facts only); the full diagnostics go to the clipboard */
-  function reportProblem() {
+  /* Opens a pre-filled GitHub issue (compact facts only); the full diagnostics go to the clipboard.
+     ctx: 'result' | 'error' | 'settings' */
+  function reportProblem(ctx) {
+    if (typeof ctx !== 'string') ctx = state.view === 'result' ? 'result' : 'error';
     var res = state.result, raw = state.raw;
     var lines = ['**What happened?**', '', '(please describe the problem here)', '', '**Diagnostics**',
-      '- App: ' + (call('appVersion') || '?') + ' (' + effectiveLang() + ')',
-      '- Product: ' + (state.url || (res && res.product && res.product.url) || '–')];
-    if (state.lastCode && state.view !== 'result') lines.push('- Error: ' + state.lastCode + (state.lastDetail ? ' – ' + state.lastDetail.slice(0, 300) : ''));
+      '- App: ' + (call('appVersion') || '?') + ' (' + effectiveLang() + ', ' + state.store + ')'];
+    var product = state.url || (res && res.product && res.product.url);
+    if (product) lines.push('- Product: ' + product);
+    if (state.lastCode && ctx === 'error') lines.push('- Error: ' + state.lastCode + (state.lastDetail ? ' – ' + state.lastDetail.slice(0, 300) : ''));
     if (raw && raw.phases) {
       lines.push('- Mode: ' + (raw.mode || '?'));
       Object.keys(raw.phases).forEach(function (k) {
-        var p = raw.phases[k] || {};
-        lines.push('- Phase ' + k + ': ok=' + !!p.ok + ', reviews=' + (p.reviews || []).length + ', blocks=' + JSON.stringify(p.blocks || {}) + (p.error ? ', error=' + String(p.error).slice(0, 200) : ''));
+        var p = raw.phases[k] || {}, tm = p.timing || {};
+        lines.push('- Phase ' + k + ': ok=' + !!p.ok + ', reviews=' + (p.reviews || []).length + ', blocks=' + JSON.stringify(p.blocks || {}) +
+          (tm.pageMs != null ? ', page=' + tm.pageMs + 'ms, read=' + tm.readMs + 'ms' : '') + (p.error ? ', error=' + String(p.error).slice(0, 200) : ''));
       });
+      if (raw.timing) lines.push('- Time: total ' + raw.timing.totalMs + 'ms' + (raw.timing.resolveMs >= 0 ? ', short link ' + raw.timing.resolveMs + 'ms' : ''));
       var pp = (raw.phases.product || {}).product || {};
       lines.push('- Found: title=' + !!pp.title + ', average=' + (pp.avg == null ? 'no' : 'yes') + ', total=' + (pp.total == null ? 'no' : 'yes') + ', histogram=' + !!pp.histogram + ', listed since=' + !!pp.firstAvailable);
       if (raw.flags && Object.keys(raw.flags).length) lines.push('- Flags: ' + JSON.stringify(raw.flags).slice(0, 300));
     }
-    if (res && state.view === 'result') lines.push('- Result: grade ' + res.grade + ' (' + res.score + '), ' + res.reviewCount + ' reviews');
+    if (res && ctx === 'result') lines.push('- Result: grade ' + res.grade + ' (' + res.score + '), ' + res.reviewCount + ' reviews');
     var dg = state.diag && (state.diag.page || state.diag);
     if (dg && dg.counts) lines.push('- Page: ' + JSON.stringify(dg.counts) + ', title: ' + String(dg.title || '').slice(0, 80));
-    lines.push('', 'The full diagnostics were copied to the clipboard – paste them below if needed.');
-    var title = state.view === 'result' ? 'Problem with a result' : 'Problem: ' + (state.lastCode || 'check failed');
-    copyDiag();
-    call('open', ISSUES_URL + '/new?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(lines.join('\n').slice(0, 3500)));
+    var hasDiag = !!(raw || state.diag);
+    if (hasDiag) lines.push('', 'The full diagnostics were copied to the clipboard – paste them below if needed.');
+    var title = ctx === 'result' ? 'Problem with a result' : ctx === 'settings' ? 'Bug: ' : 'Problem: ' + (state.lastCode || 'check failed');
+    if (hasDiag) copyDiag();
+    call('open', ISSUES_URL + '/new?labels=bug&title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(lines.join('\n').slice(0, 3500)));
+  }
+  function requestFeature() {
+    var body = ['**What would you like Rezi-Check to do?**', '', '', '**Why would that be useful?**', '', '',
+      '_App: ' + (call('appVersion') || '?') + ' (' + effectiveLang() + ')_'].join('\n');
+    call('open', ISSUES_URL + '/new?labels=enhancement&title=' + encodeURIComponent('Feature request: ') + '&body=' + encodeURIComponent(body));
   }
 
   /* ---------- Update notice (asks GitHub at most once a day; can be turned off) ---------- */
@@ -309,10 +339,13 @@
     }
     return t(n.k, p);
   }
-  function labelOf(res) { return isV2(res) ? t('grade.' + gradeKey(res.grade) + '.label') : res.label; }
+  function labelOf(res) {
+    var l = isV2(res) ? t('grade.' + gradeKey(res.grade) + '.label') : res.label;
+    return res.preliminary ? l + ' (' + t('res.preliminary') + ')' : l;
+  }
 
-  function stampSvg(grade, when) {
-    var ring = t('stamp.ring', { date: I.formatDate(when) }).toUpperCase();
+  function stampSvg(grade, when, preliminary) {
+    var ring = t(preliminary ? 'stamp.ringPrelim' : 'stamp.ring', { date: I.formatDate(when) }).toUpperCase();
     return '<svg viewBox="0 0 120 120" aria-hidden="true"><defs><path id="ring" d="M60,60 m-48.5,0 a48.5,48.5 0 1,1 97,0 a48.5,48.5 0 1,1 -97,0"/></defs>' +
       '<g filter="url(#ink)">' +
       '<circle cx="60" cy="60" r="56" fill="none" stroke="currentColor" stroke-width="4.5"/>' +
@@ -356,7 +389,7 @@
     var order = { bad: 0, warn: 1, info: 2 };
     issues.sort(function (a, b) { return order[a.level] - order[b.level] || b.penalty - a.penalty; });
 
-    var verdict = v2 ? t('grade.' + gradeKey(g) + '.text') : res.verdict;
+    var verdict = !v2 ? res.verdict : res.capped ? t(res.mode === 'deep' ? 'grade.cappedDeep.text' : 'grade.capped.text') : t('grade.' + gradeKey(g) + '.text');
     var confLevel = v2 ? t('conf.' + res.confidence) : res.confidence;
     var confText = v2 ? t(res.confMsg.k, res.confMsg.p) : res.confidenceText;
 
@@ -367,7 +400,7 @@
       (p.avg != null || p.total != null ? '<p class="report__rating"><span class="stars" aria-hidden="true">' + stars(p.avg) + '</span> ' +
         esc(t('res.rating', { avg: p.avg, total: p.total })) + '</p>' : '') +
       '</header>';
-    h += '<div class="stamp" style="--grade:' + gradeColor(g) + '" role="img" aria-label="' + esc(t('res.gradeAria', { g: g })) + '">' + stampSvg(g, res.when) + '</div>';
+    h += '<div class="stamp" style="--grade:' + gradeColor(g) + '" role="img" aria-label="' + esc(t('res.gradeAria', { g: g })) + '">' + stampSvg(g, res.when, res.preliminary) + '</div>';
     h += '<section class="verdict" style="--grade:' + gradeColor(g) + '">' +
       '<p class="verdict__label">' + esc(labelOf(res)) + '</p>' +
       '<p class="verdict__text">' + esc(verdict) + '</p>' +
@@ -447,7 +480,7 @@
 
   RC.back = function () {
     if (state.view === 'busy') { call('cancel'); show('home'); return true; }
-    if (state.view === 'result') { show('home'); return true; }
+    if (state.view === 'result' || state.view === 'settings' || state.view === 'ask') { show('home'); return true; }
     return false;
   };
 
@@ -523,9 +556,20 @@
     $('updateLater').addEventListener('click', function () { if (state.update) call('setPref', 'updateSkip', state.update.tag); renderUpdate(); });
     maybeCheckUpdate();
 
+    $('tabHome').addEventListener('click', function () { show('home'); });
+    $('tabSettings').addEventListener('click', function () { show('settings'); });
+    $('shareSel').value = call('getPref', 'share') === 'direct' ? 'direct' : 'ask';
+    $('shareSel').addEventListener('change', function () { call('setPref', 'share', $('shareSel').value); });
+    $('fbFeature').addEventListener('click', requestFeature);
+    $('fbBug').addEventListener('click', function () { reportProblem('settings'); });
+    $('abGithub').addEventListener('click', function () { call('open', REPO_URL); });
+    $('askQuick').addEventListener('click', function () { chooseMode('quick'); });
+    $('askDeep').addEventListener('click', function () { chooseMode('deep'); });
+    $('askCancel').addEventListener('click', function () { show('home'); });
+
     show('home');
     var pending = call('getPendingUrl');
-    if (pending) start(pending);
+    if (pending) RC.onIncoming(pending);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

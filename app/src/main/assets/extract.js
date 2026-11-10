@@ -19,7 +19,21 @@
     ? { reading: 'Reading product page …', waiting: 'Waiting for reviews …', loading: 'Loading reviews' }
     : { reading: 'Lese Produktseite …', waiting: 'Warte auf Rezensionen …', loading: 'Lade Rezensionen' };
 
+  var T0 = Date.now();
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  /* Waits until cond() is true. Gives up after maxMs, or `grace` ms after the page has finished loading. */
+  async function waitFor(cond, maxMs, grace) {
+    var start = Date.now(), doneAt = 0;
+    while (Date.now() - start < maxMs) {
+      if (cond()) return true;
+      if (document.readyState === 'complete') {
+        if (!doneAt) doneAt = Date.now();
+        else if (Date.now() - doneAt > grace) break;
+      }
+      await sleep(200);
+    }
+    return !!cond();
+  }
   function rand(a, b) { return Math.round(a + Math.random() * (b - a)); }
   function progress(t) { window.__RC_PROGRESS = t; }
   function clean(s) {
@@ -336,12 +350,11 @@
 
   async function productPhase() {
     progress(L.reading);
-    for (var i = 0; i < 25; i++) {
-      if (q(document, '#productTitle')) break;
+    await waitFor(function () {
+      if (q(document, '#productTitle')) return true;
       var bl = detectBlocks(document);
-      if (bl.captcha || bl.signin || bl.notFound) break;
-      await sleep(400);
-    }
+      return !!(bl.captcha || bl.signin || bl.notFound);
+    }, 25000, 2500);
     var blocks = detectBlocks(document);
     if (blocks.captcha || blocks.signin) return { phase: 'product', blocks: blocks, diag: diag() };
     var asin = getAsin();
@@ -358,12 +371,16 @@
     if (anchor && anchor.scrollIntoView) anchor.scrollIntoView();
     else window.scrollTo(0, Math.round((document.body ? document.body.scrollHeight : 4000) * 0.6));
     progress(L.waiting);
-    for (var j = 0; j < 18; j++) {
-      if (q(document, REVIEW_SEL) && q(document, '#histogramTable, [data-hook="total-review-count"]')) break;
-      await sleep(400);
-      if (j === 6 || j === 12) window.scrollBy(0, 700);
-    }
-    await sleep(600);
+    var noReviews = function () {
+      return !!q(document, '#cr-no-reviews, [data-hook="no-reviews-section"], #dp-no-customer-review-yet');
+    };
+    var steps = 0;
+    await waitFor(function () {
+      steps++;
+      if (steps === 10 || steps === 20) window.scrollBy(0, 700);
+      return noReviews() || (!!q(document, REVIEW_SEL) && !!q(document, '#histogramTable, [data-hook="total-review-count"]'));
+    }, 9000, 5000);
+    await sleep(300);   // let the rest of the review list render
 
     var seen = {}, list = [];
     harvestInto(document, seen, list, 'top');
@@ -430,12 +447,12 @@
     var maxRounds = OPTS.maxRounds || 3;
     var label = OPTS.label || L.loading;
     progress(label + ' …');
-    for (var i = 0; i < 20; i++) {
-      if (q(document, REVIEW_SEL)) break;
+    await waitFor(function () {
+      if (q(document, REVIEW_SEL)) return true;
       var bl = detectBlocks(document);
-      if (bl.captcha || bl.signin || bl.restricted) break;
-      await sleep(400);
-    }
+      return !!(bl.captcha || bl.signin || bl.restricted);
+    }, 20000, 2500);
+    if (q(document, REVIEW_SEL)) await sleep(300);
     var blocks = detectBlocks(document);
     if (blocks.captcha || blocks.signin || blocks.restricted) return { phase: OPTS.phase, blocks: blocks, reviews: [], diag: diag() };
 
@@ -481,7 +498,9 @@
 
   (async function () {
     try {
-      window.__RC_RESULT = OPTS.phase === 'product' ? await productPhase() : await reviewPhase();
+      var res = OPTS.phase === 'product' ? await productPhase() : await reviewPhase();
+      if (res) res.ms = Date.now() - T0;
+      window.__RC_RESULT = res;
     } catch (e) {
       window.__RC_RESULT = { phase: OPTS.phase, error: String((e && (e.stack || e.message)) || e), diag: diag() };
     } finally {

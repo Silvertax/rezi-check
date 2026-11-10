@@ -77,6 +77,7 @@ public class MainActivity extends Activity {
     }
     private static final Pattern STORE_HOST = Pattern.compile("amazon\\.[a-z]{2,3}(\\.[a-z]{2})?");
     private static final String LATEST_RELEASE_API = "https://api.github.com/repos/Silvertax/rezi-check/releases/latest";
+    private static final Pattern SHORT_HOST = Pattern.compile("amzn\\.(eu|to|com|asia)|a\\.co");
     private static final Pattern ASIN_IN_URL =
             Pattern.compile("/(?:dp|gp/product|gp/aw/d|product-reviews)/([A-Z0-9]{10})", Pattern.CASE_INSENSITIVE);
     private static final Pattern LOGIN_COOKIE = Pattern.compile("(?:^|;\\s*)(?:sess-)?at-[a-z]+=");
@@ -120,7 +121,9 @@ public class MainActivity extends Activity {
         final JSONObject results = new JSONObject();
         final JSONObject flags = new JSONObject();
         final JSONArray errors = new JSONArray();
-        boolean injected, awaitingUser, finished, loadIssued;
+        boolean injected, awaitingUser, finished, loadIssued, pageStarted;
+        long tStart, tLoad, tInject, resolveMs = -1;
+        int pageSeq, askedSeq = -1;
         int pollToken, interactions;
         String lastProgress = "";
         JSONObject lastDiag;
@@ -306,15 +309,25 @@ public class MainActivity extends Activity {
                 if (job != null && !job.finished) {
                     job.injected = false;
                     job.pollToken++;
+                    if (job.loadIssued) job.pageStarted = true;
+                    job.pageSeq++;
                     h.removeCallbacks(injectRunnable);
                 }
+            }
+            @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                // Start reading as soon as the page shows up instead of waiting for every last resource;
+                // the script itself waits for the parts it needs.
+                if (loginMode || job == null || job.finished || url == null || url.startsWith("about:")) return;
+                h.removeCallbacks(injectRunnable);
+                h.postDelayed(injectRunnable, 250);
             }
             @Override
             public void onPageFinished(WebView view, String url) {
                 if (loginMode) { notifyLogin(); return; }
                 if (job == null || job.finished || url == null || url.startsWith("about:")) return;
                 h.removeCallbacks(injectRunnable);
-                h.postDelayed(injectRunnable, 900);
+                h.postDelayed(injectRunnable, 300);
             }
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
@@ -334,14 +347,16 @@ public class MainActivity extends Activity {
     private final Runnable injectRunnable = this::inject;
 
     private void inject() {
-        if (job == null || job.finished || job.injected || !job.loadIssued) return;
+        if (job == null || job.finished || job.injected || !job.loadIssued || !job.pageStarted) return;
+        if (job.awaitingUser && job.askedSeq == job.pageSeq) return;   // same page the user is still working on
         Phase ph = job.current();
         if (ph == null) return;
         job.injected = true;
+        job.tInject = System.currentTimeMillis();
         final int token = ++job.pollToken;
         String code = "window.__RC_OPTS=" + ph.opts.toString() + ";\n" + extractJs;
         worker.evaluateJavascript(code, null);
-        h.postDelayed(() -> poll(token), 600);
+        h.postDelayed(() -> poll(token), 300);
     }
 
     private void poll(final int token) {
@@ -365,7 +380,7 @@ public class MainActivity extends Activity {
                     }
                 }
             } catch (Exception ignored) { /* keep polling */ }
-            h.postDelayed(() -> poll(token), 500);
+            h.postDelayed(() -> poll(token), 300);
         });
     }
 
@@ -373,15 +388,78 @@ public class MainActivity extends Activity {
     private void startJob(String url, String mode) {
         if (job != null) cancelJob(false);
         if (loginMode) closeLogin();
-        job = new Job();
-        job.url = normalizeUrl(url);
-        job.mode = "deep".equals(mode) ? "deep" : "quick";
-        job.phases.add(new Phase("product", job.url, s(R.string.phase_product), opts("product", 0, 0, ""), 60000));
+        final Job j = new Job();
+        job = j;
+        j.tStart = System.currentTimeMillis();
+        j.mode = "deep".equals(mode) ? "deep" : "quick";
         worker.getSettings().setBlockNetworkImage(true);
         worker.getSettings().setUseWideViewPort(true);
         hidePane();
         progress(s(R.string.progress_open));
+        final String in = url == null ? "" : url.trim();
+        if (isShortLink(in)) {
+            // Shared links are short links (amzn.eu/…): resolve them first, then load the product page directly
+            new Thread(() -> {
+                long t0 = System.currentTimeMillis();
+                String resolved = resolveShortLink(in);
+                long ms = System.currentTimeMillis() - t0;
+                h.post(() -> {
+                    if (job != j || j.finished) return;
+                    j.resolveMs = ms;
+                    beginJob(j, resolved != null ? resolved : in);
+                });
+            }).start();
+        } else {
+            beginJob(j, in);
+        }
+    }
+
+    private void beginJob(Job j, String url) {
+        j.url = normalizeUrl(url);
+        j.phases.add(new Phase("product", j.url, s(R.string.phase_product), opts("product", 0, 0, ""), 60000));
         nextPhase();
+    }
+
+    private static boolean isShortLink(String url) {
+        try {
+            String host = Uri.parse(url).getHost();
+            return host != null && SHORT_HOST.matcher(host.toLowerCase(Locale.ROOT)).matches();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Follows the redirects of an Amazon short link without loading any page. Returns null if that fails. */
+    private String resolveShortLink(String url) {
+        String cur = url;
+        try {
+            for (int i = 0; i < 5; i++) {
+                HttpURLConnection c = (HttpURLConnection) new URL(cur).openConnection();
+                try {
+                    c.setInstanceFollowRedirects(false);
+                    c.setConnectTimeout(5000);
+                    c.setReadTimeout(5000);
+                    c.setRequestMethod("GET");
+                    c.setRequestProperty("User-Agent", desktopUa);
+                    int code = c.getResponseCode();
+                    String loc = c.getHeaderField("Location");
+                    if (code < 300 || code >= 400 || loc == null) return null;
+                    cur = new URL(new URL(cur), loc).toString();
+                } finally {
+                    c.disconnect();
+                }
+                Uri u = Uri.parse(cur);
+                String host = u.getHost() == null ? "" : u.getHost().toLowerCase(Locale.ROOT);
+                if (!"https".equals(u.getScheme())) return null;
+                if (host.matches("(.+\\.)?amazon\\.[a-z.]+")) {
+                    return ASIN_IN_URL.matcher(u.getPath() == null ? "" : u.getPath()).find() ? cur : null;
+                }
+                if (!SHORT_HOST.matcher(host).matches()) return null;
+            }
+        } catch (Exception ignored) {
+            /* fall back to loading the short link in the WebView */
+        }
+        return null;
     }
 
     private void nextPhase() {
@@ -392,6 +470,7 @@ public class MainActivity extends Activity {
         job.injected = false;
         job.awaitingUser = false;
         job.loadIssued = false;
+        job.pageStarted = false;
         job.pollToken++;
         final Job j = job;
         final Phase phase = ph;
@@ -400,6 +479,7 @@ public class MainActivity extends Activity {
             if (job != j || j.finished) return;
             progress(phase.label + " …");
             j.loadIssued = true;
+            j.tLoad = System.currentTimeMillis();
             worker.loadUrl(phase.url);
             scheduleTimeout(j, j.idx, phase.timeoutMs);
         }, delay);
@@ -425,6 +505,14 @@ public class MainActivity extends Activity {
         JSONObject blocks = r.optJSONObject("blocks");
         if (blocks == null) blocks = new JSONObject();
         job.lastDiag = r.optJSONObject("diag");
+        try {
+            long now = System.currentTimeMillis();
+            JSONObject tm = new JSONObject();
+            tm.put("pageMs", job.tInject - job.tLoad);
+            tm.put("readMs", now - job.tInject);
+            tm.put("sinceStartMs", now - job.tStart);
+            r.put("timing", tm);
+        } catch (Exception ignored) { }
 
         if (blocks.optBoolean("captcha") || ("product".equals(ph.name) && blocks.optBoolean("signin"))) {
             job.interactions++;
@@ -489,6 +577,10 @@ public class MainActivity extends Activity {
             out.put("phases", job.results);
             if (job.errors.length() > 0) job.flags.put("errors", job.errors);
             out.put("flags", job.flags);
+            JSONObject tm = new JSONObject();
+            tm.put("totalMs", System.currentTimeMillis() - job.tStart);
+            tm.put("resolveMs", job.resolveMs);
+            out.put("timing", tm);
             js("RC.onData(" + out + ")");
         } catch (Exception e) {
             js("RC.onError('script'," + JSONObject.quote(String.valueOf(e.getMessage())) + ",null)");
@@ -556,6 +648,7 @@ public class MainActivity extends Activity {
     /* ---------- Visible Amazon area ---------- */
     private void askUser(String text) {
         job.awaitingUser = true;
+        job.askedSeq = job.pageSeq;
         paneText.setText(text);
         paneButton.setText(s(R.string.btn_cancel));
         worker.getSettings().setBlockNetworkImage(false);

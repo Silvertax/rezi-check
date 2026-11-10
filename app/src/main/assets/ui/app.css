@@ -182,6 +182,29 @@ b { font-weight: 600; }
 .update__actions { display: flex; margin-left: auto; }
 .setting__hint { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
 
+/* ---------- Tabs ---------- */
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; background: var(--sheet); border-top: 1px solid var(--rule); z-index: 5; }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px 10px; border: 0; background: none; color: var(--ink-2); font: 600 13px/1 var(--body); cursor: pointer; }
+.tab__icon { width: 24px; height: 24px; }
+.tab[aria-current="page"] { color: var(--pen); }
+.tab:focus-visible { outline: 3px solid var(--pen); outline-offset: -3px; }
+#home, #settings { padding-bottom: 96px; }
+.stack { display: grid; gap: 8px; }
+.about__ver { margin: 0; color: var(--ink-2); font-size: 15px; }
+.about__link { margin-left: -8px; }
+
+/* ---------- Shared link: choose the depth ---------- */
+.ask { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-top: 24px; padding-bottom: 60px; }
+.ask__title { margin: 0; font: 700 30px/1.1 var(--cond); }
+.ask__link { margin: 6px 0 18px; color: var(--ink-2); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choice { display: block; width: 100%; text-align: left; margin: 0 0 10px; padding: 16px; border: 1.5px solid var(--ink); border-radius: var(--radius); background: var(--sheet); color: var(--ink); cursor: pointer; }
+.choice:active { background: var(--pen-soft); }
+.choice:focus-visible { outline: 3px solid var(--pen); outline-offset: 2px; }
+.choice__name { display: block; font: 700 21px/1.2 var(--semi); }
+.choice__hint { display: block; margin-top: 4px; font: 400 14px/1.4 var(--body); color: var(--ink-2); }
+.ask__note { margin: 6px 0 8px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.ask .btn { align-self: flex-start; margin-left: -8px; }
+
 .foot { margin-top: 34px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
 .foot p { margin: 0 0 6px; }
 .foot__ver { opacity: .7; }
