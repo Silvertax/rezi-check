@@ -71,7 +71,14 @@ The result is an estimate based on patterns, not proof.
 - [x] Pure black dark mode (1.2)
 - [x] Info button explaining why sign-in is needed and what happens to your data (1.3)
 - [ ] Update notice in the app when a new version is released on GitHub
+- [ ] “Report problem” button that opens a pre-filled GitHub issue with the diagnostics
 - [ ] Availability on F-Droid / IzzyOnDroid
+- [ ] New checks: reviews that don't match the product, and made-up brand names
+- [ ] More honest grades when only a few reviews are visible (cap the grade or mark it as preliminary)
+- [ ] Warning when “Thorough” is used very often, to protect your Amazon account from being limited
+- [ ] Text patterns for reviews in French, Italian and Spanish
+- [ ] Automated tests in the repository
+- [ ] Releases built and signed automatically by GitHub
 - [ ] More patterns for detecting fake reviews
 - [ ] Review checks for other online shops besides Amazon
 
