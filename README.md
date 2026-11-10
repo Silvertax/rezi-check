@@ -40,10 +40,11 @@ Tip: with [Obtainium](https://github.com/ImranR98/Obtainium) you get new version
 | Got the product for free | Positive reviews from people who got the product free or discounted outside Amazon Vine |
 | Star distribution | Almost only 5 stars and hardly any 4 stars, or “love it or hate it” with nothing in between |
 | Reviews older than the product | Hints that reviews were taken over from other products |
+| Reviews don’t match the product | Several reviews are about a different kind of product and never mention this one |
 | Ratings compared to sales | More ratings per month than the product sells |
 | New vs. old reviews¹ | The newest reviews are clearly worse than the overall average |
 | Bursts over time¹ | Waves of positive reviews within a few days |
-| Further hints | Share of verified purchases and Vine testers, other buyers calling the reviews fake, praise without substance |
+| Further hints | Share of verified purchases and Vine testers, other buyers calling the reviews fake, praise without substance, brand names that look like random letters |
 
 ¹ only in “Thorough” mode
 
@@ -52,7 +53,8 @@ The result is an estimate based on patterns, not proof.
 
 ## Privacy
 
-- No server of its own, no tracking, no ads. The app only talks to Amazon.
+- No server of its own, no tracking, no ads. The app only talks to Amazon – and, at most once a day, asks GitHub
+  whether a new version is available. No personal data is sent; you can turn this off under **Settings → Check for updates**.
 - History and your Amazon sign-in (cookies) stay on your phone. “Sign out” deletes the cookies.
 - You enter your credentials directly on Amazon’s sign-in page. The app does not read them.
 
@@ -61,8 +63,8 @@ The result is an estimate based on patterns, not proof.
 - Without signing in, Amazon shows only about 10 reviews per product.
 - Amazon may temporarily limit accounts whose behavior looks like automated reading to only a few reviews.
   “Thorough” therefore loads only a few pages, with pauses – still, use it sparingly.
-- If Amazon changes its pages, the app may stop recognizing them. Then tap “Copy diagnostics” in the app
-  and open an [issue](https://github.com/Silvertax/rezi-check/issues) with the text.
+- If Amazon changes its pages, the app may stop recognizing them. Then tap “Report problem” in the app –
+  it opens a GitHub issue with the diagnostics already filled in.
 
 ## Roadmap
 
@@ -70,10 +72,10 @@ The result is an estimate based on patterns, not proof.
 - [x] Sign-in for “Thorough” at all major Amazon stores (1.1)
 - [x] Pure black dark mode (1.2)
 - [x] Info button explaining why sign-in is needed and what happens to your data (1.3)
-- [ ] Update notice in the app when a new version is released on GitHub
-- [ ] “Report problem” button that opens a pre-filled GitHub issue with the diagnostics
+- [x] Update notice in the app when a new version is released on GitHub (1.4)
+- [x] “Report problem” button that opens a pre-filled GitHub issue with the diagnostics (1.4)
 - [ ] Availability on F-Droid / IzzyOnDroid
-- [ ] New checks: reviews that don't match the product, and made-up brand names
+- [x] New checks: reviews that don't match the product, and made-up brand names (1.4)
 - [ ] More honest grades when only a few reviews are visible (cap the grade or mark it as preliminary)
 - [ ] Warning when “Thorough” is used very often, to protect your Amazon account from being limited
 - [ ] Text patterns for reviews in French, Italian and Spanish
