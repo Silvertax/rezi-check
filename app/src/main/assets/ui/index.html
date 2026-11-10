@@ -21,6 +21,11 @@
         <path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
         <path d="M10 6.6l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" fill="currentColor"/>
       </symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24">
+        <path d="M4 7h7M15 7h5M4 17h3M11 17h9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+        <circle cx="13" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <circle cx="9" cy="17" r="2.4" fill="none" stroke="currentColor" stroke-width="2.2"/>
+      </symbol>
     </defs>
   </svg>
 
@@ -87,8 +92,17 @@
       <button id="histClear" class="btn btn--quiet history__clear" type="button" data-i18n="hist.clear" hidden></button>
     </section>
 
+    <footer class="foot">
+      <p data-i18n="foot.text"></p>
+    </footer>
+  </main>
+
+  <!-- Settings -->
+  <main id="settings" class="view" hidden>
+    <header class="masthead">
+      <h1 id="setHead" class="wordmark" data-i18n="settings.title"></h1>
+    </header>
     <section class="settings" aria-labelledby="setHead">
-      <h2 id="setHead" class="section-title" data-i18n="settings.title"></h2>
       <div class="setting">
         <label for="langSel" class="setting__label" data-i18n="settings.lang"></label>
         <span class="setting__wrap">
@@ -105,17 +119,53 @@
       </div>
       <p class="setting__hint" data-i18n="settings.storeHint"></p>
       <div class="setting">
+        <label for="shareSel" class="setting__label" data-i18n="settings.share"></label>
+        <span class="setting__wrap">
+          <select id="shareSel" class="setting__select">
+            <option value="ask" data-i18n="settings.shareAsk"></option>
+            <option value="direct" data-i18n="settings.shareDirect"></option>
+          </select>
+        </span>
+      </div>
+      <p class="setting__hint" data-i18n="settings.shareHint"></p>
+      <div class="setting">
         <label for="updChk" class="setting__label" data-i18n="settings.updates"></label>
         <input id="updChk" class="setting__check" type="checkbox">
       </div>
       <p class="setting__hint" data-i18n="settings.updatesHint"></p>
     </section>
 
-    <footer class="foot">
-      <p data-i18n="foot.text"></p>
-      <p id="ver" class="foot__ver"></p>
-    </footer>
+    <section aria-labelledby="fbHead">
+      <h2 id="fbHead" class="section-title" data-i18n="feedback.title"></h2>
+      <div class="stack">
+        <button id="fbFeature" class="btn btn--line" type="button" data-i18n="feedback.feature"></button>
+        <button id="fbBug" class="btn btn--line" type="button" data-i18n="feedback.bug"></button>
+      </div>
+      <p class="setting__hint" data-i18n="feedback.hint"></p>
+    </section>
+
+    <section aria-labelledby="abHead">
+      <h2 id="abHead" class="section-title" data-i18n="about.title"></h2>
+      <p id="ver" class="about__ver"></p>
+      <button id="abGithub" class="btn btn--quiet about__link" type="button" data-i18n="about.github"></button>
+    </section>
   </main>
+
+  <!-- Shared link: choose the depth -->
+  <section id="ask" class="view ask" hidden>
+    <h1 class="ask__title" data-i18n="ask.title"></h1>
+    <p id="askLink" class="ask__link"></p>
+    <button id="askQuick" class="choice" type="button">
+      <span class="choice__name" data-i18n="mode.quick"></span>
+      <span class="choice__hint" data-i18n="hint.quick"></span>
+    </button>
+    <button id="askDeep" class="choice" type="button">
+      <span class="choice__name" data-i18n="mode.deep"></span>
+      <span id="askDeepHint" class="choice__hint"></span>
+    </button>
+    <p class="ask__note" data-i18n="ask.note"></p>
+    <button id="askCancel" class="btn btn--quiet" type="button" data-i18n="busy.cancel"></button>
+  </section>
 
   <!-- Check in progress -->
   <section id="busy" class="view busy" hidden aria-live="polite">
@@ -136,6 +186,11 @@
     </nav>
     <article id="report" class="report"></article>
   </main>
+
+  <nav id="tabs" class="tabs" data-i18n-aria="tabs.aria">
+    <button id="tabHome" class="tab" type="button"><svg class="tab__icon" aria-hidden="true"><use href="#i-lens"/></svg><span data-i18n="tab.check"></span></button>
+    <button id="tabSettings" class="tab" type="button"><svg class="tab__icon" aria-hidden="true"><use href="#i-sliders"/></svg><span data-i18n="tab.settings"></span></button>
+  </nav>
 
   <script src="i18n.js"></script>
   <script src="analyze.js"></script>

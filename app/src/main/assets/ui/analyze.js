@@ -521,8 +521,14 @@
       for (var i = 0; i < GRADES.length; i++) if (score >= GRADES[i].min) { grade = GRADES[i].g; break; }
     }
 
+    // Honest grades with little data: the best grade needs at least 20 checked reviews,
+    // and with fewer than 12 the grade is only preliminary. Bad grades are never softened.
+    var capped = false;
+    if (grade === 'A' && n < 20) { grade = 'B'; capped = true; }
+    var preliminary = grade !== '?' && n < 12;
+
     var conf = n >= 40 ? 'high' : n >= 12 ? 'medium' : 'low';
-    var confMsg = conf === 'low' ? M('conf.few', { n: n }) : M('conf.checked', { n: n });
+    var confMsg = conf === 'low' ? M(raw.mode === 'deep' ? 'conf.fewDeep' : 'conf.few', { n: n }) : M('conf.checked', { n: n });
 
     // Adjusted sample average
     var sample = D.recent.length >= 15 ? D.recent : D.unbiased;
@@ -564,6 +570,8 @@
       mode: raw.mode || 'quick',
       score: score,
       grade: grade,
+      capped: capped,
+      preliminary: preliminary,
       confidence: conf,
       confMsg: confMsg,
       reviewCount: n,
