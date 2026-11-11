@@ -84,11 +84,15 @@ The result is an estimate based on patterns, not proof.
 - [ ] Warning when “Thorough” is used very often, to protect your Amazon account from being limited
 - [ ] Text patterns for reviews in French, Italian and Spanish
 - [ ] Automated tests in the repository
-- [ ] Releases built and signed automatically by GitHub
+- [x] Releases built and signed automatically by GitHub
 - [ ] More patterns for detecting fake reviews
 - [ ] Review checks for other online shops besides Amazon
 
 Ideas or wishes? Open an [issue](https://github.com/Silvertax/rezi-check/issues).
+
+## Releases
+
+Releases are built by GitHub: set `versionCode` and `versionName` in `app/build.gradle`, merge, then publish a GitHub release with the tag `v<versionName>`. The workflow in `.github/workflows/release.yml` builds the APK, checks that it is signed with the project's certificate, attaches `Rezi-Check-<version>.apk` and adds the checksums to the release notes. It needs the signing key as repository secrets; their names are listed at the top of the workflow file.
 
 ## Legal
 
