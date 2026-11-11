@@ -1,0 +1,110 @@
+# Builds the signed release APK.
+#  - published release: build, check the signature, attach Rezi-Check-<version>.apk
+#    and add the checksums to the release notes
+#  - manual run: build and check only, the APK is kept as a workflow artifact
+#
+# Needs four repository secrets (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64    the keystore file, base64-encoded
+#   KEYSTORE_PASSWORD  its password
+#   KEY_ALIAS          the key's alias inside the keystore
+#   KEY_PASSWORD       the key's password
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Every release must be signed with this certificate, otherwise the APK
+  # cannot be installed over an earlier version.
+  EXPECTED_CERT_SHA256: 6bcc82082e48bc713dd62b573894a5342f1e3884345325e390fcb4264dc19131
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check version and tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(sed -n "s/^ *versionName '\(.*\)'.*/\1/p" app/build.gradle)
+          test -n "$version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          if [ -n "$TAG" ] && [ "$TAG" != "v$version" ]; then
+            echo "::error::Release tag $TAG does not match versionName $version in app/build.gradle (expected v$version)"
+            exit 1
+          fi
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "$(printenv "$name")" ]; then
+              echo "::error::Repository secret $name is not set"
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          {
+            echo "storeFile=release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > keystore.properties
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Check signature
+        run: |
+          rm -f release.jks keystore.properties
+          apk=$(ls app/build/outputs/apk/release/*.apk)
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
+          cert=$("$bt/apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          if [ "$cert" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::APK is signed with certificate '$cert', expected $EXPECTED_CERT_SHA256"
+            exit 1
+          fi
+          out="Rezi-Check-$VERSION.apk"
+          cp "$apk" "$out"
+          echo "APK=$out" >> "$GITHUB_ENV"
+          echo "APK_SHA256=$(sha256sum "$out" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rezi-check-release
+          path: ${{ env.APK }}
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "$TAG" "$APK" --clobber
+          gh release view "$TAG" --json body --jq .body > notes.md
+          if ! grep -q '^\*\*Checksums\*\*' notes.md; then
+            {
+              echo
+              echo "**Checksums**"
+              echo "- APK (SHA-256): \`$APK_SHA256\`"
+              echo "- Signing certificate (SHA-256): \`$EXPECTED_CERT_SHA256\`"
+            } >> notes.md
+            gh release edit "$TAG" --notes-file notes.md
+          fi
