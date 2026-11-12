@@ -90,6 +90,7 @@ public class MainActivity extends Activity {
     private WebView worker;
     private LinearLayout pane;       // visible Amazon area (sign-in / security check)
     private TextView paneText;
+    private LinearLayout paneBar;    // bar above the Amazon area
     private Button paneButton;
 
     private String extractJs;
@@ -138,25 +139,21 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("rezicheck", MODE_PRIVATE);
         extractJs = readAsset("extract.js");
         boolean dark = isDarkMode();
-        int bg = dark ? Color.parseColor("#000000") : Color.parseColor("#E6ECF5");
+        boolean oled = dark && "on".equals(prefs.getString("p_oled", null));
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(bg);
         setContentView(root);
-        setupSystemBars(dark, bg);
+        setupInsets();
 
         // Amazon WebView (sits underneath the UI)
         pane = new LinearLayout(this);
         pane.setOrientation(LinearLayout.VERTICAL);
-        pane.setBackgroundColor(bg);
-        LinearLayout bar = new LinearLayout(this);
+        LinearLayout bar = paneBar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         int p = dp(12);
         bar.setPadding(dp(16), p, dp(8), p);
-        bar.setBackgroundColor(dark ? Color.BLACK : Color.WHITE);
         paneText = new TextView(this);
-        paneText.setTextColor(dark ? Color.parseColor("#E7ECF6") : Color.parseColor("#16233F"));
         paneText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         bar.addView(paneText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         paneButton = new Button(this);
@@ -173,7 +170,7 @@ public class MainActivity extends Activity {
 
         // UI
         ui = new WebView(this);
-        ui.setBackgroundColor(bg);
+        applyLook(dark, oled);
         WebSettings us = ui.getSettings();
         us.setJavaScriptEnabled(true);
         us.setDomStorageEnabled(true);
@@ -234,7 +231,7 @@ public class MainActivity extends Activity {
 
     /* ---------- System bars (edge-to-edge from Android 15) ---------- */
     @SuppressWarnings("deprecation")
-    private void setupSystemBars(boolean dark, int bg) {
+    private void setupInsets() {
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             int l, t, r, b;
             if (Build.VERSION.SDK_INT >= 30) {
@@ -247,6 +244,18 @@ public class MainActivity extends Activity {
             v.setPadding(l, t, r, b);
             return Build.VERSION.SDK_INT >= 30 ? WindowInsets.CONSUMED : insets.consumeSystemWindowInsets();
         });
+    }
+
+    /* ---------- Look: light, dark or OLED black (the page sends the choice) ---------- */
+    @SuppressWarnings("deprecation")
+    private void applyLook(boolean dark, boolean oled) {
+        int bg = oled ? Color.BLACK : dark ? Color.parseColor("#101319") : Color.parseColor("#F3F5FA");
+        getWindow().getDecorView().setBackgroundColor(bg);
+        root.setBackgroundColor(bg);
+        pane.setBackgroundColor(bg);
+        if (ui != null) ui.setBackgroundColor(bg);
+        paneBar.setBackgroundColor(oled ? Color.BLACK : dark ? Color.parseColor("#1A1E27") : Color.WHITE);
+        paneText.setTextColor(dark ? Color.parseColor("#E7ECF6") : Color.parseColor("#16233F"));
         if (Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController c = getWindow().getInsetsController();
             if (c != null) {
@@ -255,8 +264,8 @@ public class MainActivity extends Activity {
             }
         } else {
             int flags = getWindow().getDecorView().getSystemUiVisibility();
-            if (!dark) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            if (!dark && Build.VERSION.SDK_INT >= 26) flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            int light = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            flags = dark ? flags & ~light : flags | light;
             getWindow().getDecorView().setSystemUiVisibility(flags);
         }
         if (Build.VERSION.SDK_INT < 35) {
@@ -265,8 +274,16 @@ public class MainActivity extends Activity {
         }
     }
 
-    private boolean isDarkMode() {
+    private boolean isSystemDark() {
         return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    /** The chosen theme (Settings → Theme), otherwise the phone's. */
+    private boolean isDarkMode() {
+        String theme = prefs.getString("p_theme", null);
+        if ("light".equals(theme)) return false;
+        if ("dark".equals(theme)) return true;
+        return isSystemDark();
     }
 
     /* ---------- Amazon-WebView ---------- */
@@ -834,6 +851,8 @@ public class MainActivity extends Activity {
         @JavascriptInterface public boolean loggedInFor(String store) { return isLoggedIn("https://www." + cleanStore(store)); }
         @JavascriptInterface public String getSystemLocale() { return systemLocale(); }
         @JavascriptInterface public boolean isDark() { return isDarkMode(); }
+        @JavascriptInterface public boolean isSystemDark() { return MainActivity.this.isSystemDark(); }
+        @JavascriptInterface public void applyTheme(boolean dark, boolean oled) { h.post(() -> applyLook(dark, oled)); }
         @JavascriptInterface public String appVersion() { return BuildConfig.VERSION_NAME; }
         @JavascriptInterface public void setCanGoBack(boolean b) { uiCanGoBack = b; }
         @JavascriptInterface public String getPendingUrl() {

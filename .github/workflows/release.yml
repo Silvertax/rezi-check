@@ -76,7 +76,8 @@ jobs:
           rm -f release.jks keystore.properties
           apk=$(ls app/build/outputs/apk/release/*.apk)
           bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
-          cert=$("$bt/apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          # apksigner 37 prints "V2 Signer: certificate …", older versions "Signer #1 certificate …"
+          cert=$("$bt/apksigner" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1)
           if [ "$cert" != "$EXPECTED_CERT_SHA256" ]; then
             echo "::error::APK is signed with certificate '$cert', expected $EXPECTED_CERT_SHA256"
             exit 1
