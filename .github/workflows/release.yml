@@ -1,5 +1,6 @@
 # Builds the signed release APK.
-#  - published release: build, check the signature, attach Rezi-Check-<version>.apk
+#  - published release: build, check the signature, attach Rezi-Check-<version>.apk,
+#    fill in an empty title and description (from CHANGELOG.md, see .github/release-notes.sh)
 #    and add the checksums to the release notes
 #  - manual run: build and check only, the APK is kept as a workflow artifact
 #
@@ -28,6 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # all tags and history, for the "Full changelog" link and the commit list in the notes
+          fetch-depth: 0
 
       - name: Check version and tag
         env:
@@ -39,6 +43,9 @@ jobs:
           if [ -n "$TAG" ] && [ "$TAG" != "v$version" ]; then
             echo "::error::Release tag $TAG does not match versionName $version in app/build.gradle (expected v$version)"
             exit 1
+          fi
+          if ! grep -qE "^## ${version//./\\.}( |$)" CHANGELOG.md; then
+            echo "::warning::CHANGELOG.md has no section for $version; an empty release description gets the commit messages instead."
           fi
 
       - name: Signing key
@@ -99,7 +106,15 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           gh release upload "$TAG" "$APK" --clobber
+          # Fill in title and description when they were left empty in the GitHub UI.
+          name=$(gh release view "$TAG" --json name --jq .name)
+          if [ -z "$name" ] || [ "$name" = "$TAG" ]; then
+            gh release edit "$TAG" --title "Rezi-Check $VERSION"
+          fi
           gh release view "$TAG" --json body --jq .body > notes.md
+          if [ -z "$(tr -d '[:space:]' < notes.md)" ]; then
+            bash .github/release-notes.sh "$TAG" > notes.md
+          fi
           if ! grep -q '^\*\*Checksums\*\*' notes.md; then
             {
               echo

@@ -95,7 +95,7 @@ Ideas or wishes? Open an [issue](https://github.com/Silvertax/rezi-check/issues)
 
 ## Releases
 
-Releases are built by GitHub: set `versionCode` and `versionName` in `app/build.gradle`, merge, then publish a GitHub release with the tag `v<versionName>`. The workflow in `.github/workflows/release.yml` builds the APK, checks that it is signed with the project's certificate, attaches `Rezi-Check-<version>.apk` and adds the checksums to the release notes. It needs the signing key as repository secrets; their names are listed at the top of the workflow file.
+Releases are built by GitHub: set `versionCode` and `versionName` in `app/build.gradle`, describe the changes in a new section `## <versionName>` of [CHANGELOG.md](CHANGELOG.md), merge, then publish a GitHub release with the tag `v<versionName>`. Title and description can stay empty. The workflow in `.github/workflows/release.yml` builds the APK, checks that it is signed with the project's certificate, attaches `Rezi-Check-<version>.apk`, fills in an empty title and description (from the changelog, or the commit messages if it has no section for the version) and adds the checksums to the release notes. It needs the signing key as repository secrets; their names are listed at the top of the workflow file.
 
 ## Legal
 
