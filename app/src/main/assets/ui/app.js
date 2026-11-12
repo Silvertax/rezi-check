@@ -505,11 +505,31 @@
     applyStatic();
   }
 
+  /* ---------- Theme: like the phone, light or dark; OLED makes dark pure black ---------- */
+  function themePref() { var v = call('getPref', 'theme'); return v === 'light' || v === 'dark' ? v : 'auto'; }
+  function oledOn() { return call('getPref', 'oled') === 'on'; }
+  function systemDark() {
+    var d = call('isSystemDark');
+    if (d === null) d = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return !!d;
+  }
+  function applyTheme() {
+    var pref = themePref();
+    var dark = pref === 'dark' || (pref === 'auto' && systemDark());
+    var root = document.documentElement;
+    root.classList.toggle('dark', dark);
+    root.classList.toggle('oled', dark && oledOn());
+    // In the light theme the OLED switch has nothing to do.
+    $('oledChk').disabled = !dark;
+    $('oledRow').classList.toggle('setting--off', !dark);
+    call('applyTheme', dark, dark && oledOn());
+  }
+
   /* ---------- Start ---------- */
   function init() {
-    var dark = call('isDark');
-    if (dark === null) dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.classList.toggle('dark', !!dark);
+    $('themeSel').value = themePref();
+    $('oledChk').checked = oledOn();
+    applyTheme();
 
     var lp = call('getPref', 'lang');
     state.langPref = lp === 'de' || lp === 'en' ? lp : 'auto';
@@ -558,6 +578,8 @@
 
     $('tabHome').addEventListener('click', function () { show('home'); });
     $('tabSettings').addEventListener('click', function () { show('settings'); });
+    $('themeSel').addEventListener('change', function () { call('setPref', 'theme', $('themeSel').value); applyTheme(); });
+    $('oledChk').addEventListener('change', function () { call('setPref', 'oled', $('oledChk').checked ? 'on' : 'off'); applyTheme(); });
     $('shareSel').value = call('getPref', 'share') === 'direct' ? 'direct' : 'ask';
     $('shareSel').addEventListener('change', function () { call('setPref', 'share', $('shareSel').value); });
     $('fbFeature').addEventListener('click', requestFeature);

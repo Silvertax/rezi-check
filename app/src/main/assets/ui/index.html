@@ -19,7 +19,7 @@
       <symbol id="i-lens" viewBox="0 0 24 24">
         <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
         <path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
-        <path d="M10 6.6l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" fill="currentColor"/>
+        <path d="M10 6.6l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z" style="fill: var(--lens-star, currentColor)"/>
       </symbol>
       <symbol id="i-sliders" viewBox="0 0 24 24">
         <path d="M4 7h7M15 7h5M4 17h3M11 17h9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
@@ -103,51 +103,89 @@
       <h1 id="setHead" class="wordmark" data-i18n="settings.title"></h1>
     </header>
     <section class="settings" aria-labelledby="setHead">
-      <div class="setting">
-        <label for="langSel" class="setting__label" data-i18n="settings.lang"></label>
-        <span class="setting__wrap">
-          <select id="langSel" class="setting__select">
-            <option value="auto"></option>
-            <option value="de" lang="de">Deutsch</option>
-            <option value="en" lang="en">English</option>
-          </select>
-        </span>
+      <h2 class="group-label" data-i18n="settings.groupLook"></h2>
+      <div class="group-card">
+        <div class="setting">
+          <label for="langSel" class="setting__text"><span class="setting__label" data-i18n="settings.lang"></span></label>
+          <span class="setting__wrap">
+            <select id="langSel" class="setting__select">
+              <option value="auto"></option>
+              <option value="de" lang="de">Deutsch</option>
+              <option value="en" lang="en">English</option>
+            </select>
+          </span>
+        </div>
+        <div class="setting">
+          <label for="themeSel" class="setting__text"><span class="setting__label" data-i18n="settings.theme"></span></label>
+          <span class="setting__wrap">
+            <select id="themeSel" class="setting__select">
+              <option value="auto" data-i18n="theme.auto"></option>
+              <option value="light" data-i18n="theme.light"></option>
+              <option value="dark" data-i18n="theme.dark"></option>
+            </select>
+          </span>
+        </div>
+        <div id="oledRow" class="setting">
+          <label for="oledChk" class="setting__text">
+            <span class="setting__label" data-i18n="settings.oled"></span>
+            <span class="setting__hint" data-i18n="settings.oledHint"></span>
+          </label>
+          <input id="oledChk" class="switch" type="checkbox" role="switch">
+        </div>
       </div>
-      <div class="setting">
-        <label for="storeSel" class="setting__label" data-i18n="settings.store"></label>
-        <span class="setting__wrap"><select id="storeSel" class="setting__select"></select></span>
+
+      <h2 class="group-label" data-i18n="settings.groupCheck"></h2>
+      <div class="group-card">
+        <div class="setting">
+          <label for="storeSel" class="setting__text">
+            <span class="setting__label" data-i18n="settings.store"></span>
+            <span class="setting__hint" data-i18n="settings.storeHint"></span>
+          </label>
+          <span class="setting__wrap"><select id="storeSel" class="setting__select"></select></span>
+        </div>
+        <div class="setting">
+          <label for="shareSel" class="setting__text">
+            <span class="setting__label" data-i18n="settings.share"></span>
+            <span class="setting__hint" data-i18n="settings.shareHint"></span>
+          </label>
+          <span class="setting__wrap">
+            <select id="shareSel" class="setting__select">
+              <option value="ask" data-i18n="settings.shareAsk"></option>
+              <option value="direct" data-i18n="settings.shareDirect"></option>
+            </select>
+          </span>
+        </div>
       </div>
-      <p class="setting__hint" data-i18n="settings.storeHint"></p>
-      <div class="setting">
-        <label for="shareSel" class="setting__label" data-i18n="settings.share"></label>
-        <span class="setting__wrap">
-          <select id="shareSel" class="setting__select">
-            <option value="ask" data-i18n="settings.shareAsk"></option>
-            <option value="direct" data-i18n="settings.shareDirect"></option>
-          </select>
-        </span>
+
+      <h2 class="group-label" data-i18n="settings.groupApp"></h2>
+      <div class="group-card">
+        <div class="setting">
+          <label for="updChk" class="setting__text">
+            <span class="setting__label" data-i18n="settings.updates"></span>
+            <span class="setting__hint" data-i18n="settings.updatesHint"></span>
+          </label>
+          <input id="updChk" class="switch" type="checkbox" role="switch">
+        </div>
       </div>
-      <p class="setting__hint" data-i18n="settings.shareHint"></p>
-      <div class="setting">
-        <label for="updChk" class="setting__label" data-i18n="settings.updates"></label>
-        <input id="updChk" class="setting__check" type="checkbox">
-      </div>
-      <p class="setting__hint" data-i18n="settings.updatesHint"></p>
     </section>
 
     <section aria-labelledby="fbHead">
-      <h2 id="fbHead" class="section-title" data-i18n="feedback.title"></h2>
-      <div class="stack">
-        <button id="fbFeature" class="btn btn--line" type="button" data-i18n="feedback.feature"></button>
-        <button id="fbBug" class="btn btn--line" type="button" data-i18n="feedback.bug"></button>
+      <h2 id="fbHead" class="group-label" data-i18n="feedback.title"></h2>
+      <div class="group-card card-pad">
+        <div class="stack">
+          <button id="fbFeature" class="btn btn--line" type="button" data-i18n="feedback.feature"></button>
+          <button id="fbBug" class="btn btn--line" type="button" data-i18n="feedback.bug"></button>
+        </div>
+        <p class="card-hint" data-i18n="feedback.hint"></p>
       </div>
-      <p class="setting__hint" data-i18n="feedback.hint"></p>
     </section>
 
     <section aria-labelledby="abHead">
-      <h2 id="abHead" class="section-title" data-i18n="about.title"></h2>
-      <p id="ver" class="about__ver"></p>
-      <button id="abGithub" class="btn btn--quiet about__link" type="button" data-i18n="about.github"></button>
+      <h2 id="abHead" class="group-label" data-i18n="about.title"></h2>
+      <div class="group-card card-pad">
+        <p id="ver" class="about__ver"></p>
+        <button id="abGithub" class="btn btn--quiet about__link" type="button" data-i18n="about.github"></button>
+      </div>
     </section>
   </main>
 

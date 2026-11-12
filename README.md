@@ -32,6 +32,8 @@ Tip: with [Obtainium](https://github.com/ImranR98/Obtainium) you get new version
   (e.g. Amazon.com, Amazon.co.uk, Amazon.de). You can check products from all of these stores.
 - **When sharing:** by default the app asks whether to check quickly or thoroughly. Under **Settings → When sharing**
   you can make it start right away with the depth you chose last.
+- **Theme:** under **Settings → Theme** the app follows your phone, or stays light or dark. **OLED mode** makes the
+  dark theme pure black, which saves power on OLED screens.
 
 ## What it checks
 
@@ -85,6 +87,7 @@ The result is an estimate based on patterns, not proof.
 - [ ] Text patterns for reviews in French, Italian and Spanish
 - [ ] Automated tests in the repository
 - [x] Releases built and signed automatically by GitHub
+- [x] New design; theme choice (automatic, light, dark) and OLED mode (1.6)
 - [ ] More patterns for detecting fake reviews
 - [ ] Review checks for other online shops besides Amazon
 
